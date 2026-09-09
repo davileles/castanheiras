@@ -80,7 +80,7 @@ nav button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--a
 .x:hover{background:var(--desp-soft);color:var(--red)}
 
 /* ══ FORM ══ */
-input[type=text],input[type=number],input[type=password],input[type=email],select{
+input[type=text],input[type=number],input[type=password],input[type=email],input[type=date],select{
   width:100%;background:var(--card);border:1px solid var(--border-ctrl);color:var(--text);
   padding:9px 12px;border-radius:10px;font-size:13px;outline:none;transition:border-color .2s;min-width:0}
 input:focus,select:focus{border-color:var(--accent)}
@@ -115,7 +115,13 @@ td.pago{background:var(--rec-soft);color:var(--green)}
 td.mes-atual{box-shadow:inset 0 2px 0 var(--accent)}
 td.desc{text-align:left;white-space:normal;min-width:220px;max-width:360px;font-weight:500}
 td input[type=text]{width:100%;min-width:120px} td input.apto{min-width:60px;width:70px} td input[type=number]{width:100px}
-td.acao{text-align:center;width:40px}
+td.acao{text-align:center;width:auto;white-space:nowrap}
+.ed,.ok{background:none;border:0;color:var(--muted2);font-size:14px;line-height:1;padding:4px 8px;border-radius:6px;transition:all .15s}
+.ed:hover{background:var(--card);color:var(--accent)}
+.ok{color:var(--green)} .ok:hover{background:var(--rec-soft)}
+tr.editando td{background:var(--card-deep)}
+tr.editando .campos-destino{display:flex;gap:6px;flex-wrap:wrap}
+tr.editando td input[type=date]{width:auto;min-width:140px}
 select.inline{padding:5px 8px;font-size:12px;max-width:240px;border-radius:8px}
 /* Dentro da tabela o select herdaria width:100% da celula e ficaria estreito
    demais para ler "202 - Guilherme e Ionara" ou "Conservadora". */
@@ -524,17 +530,81 @@ function renderDespesas(){
   };
 }
 
+// Edicao de um lancamento ja gravado. EDIT_BUF guarda a versao em rascunho:
+// trocar o tipo troca a lista de destinos, e sem o rascunho o que ja foi
+// digitado nos outros campos se perderia a cada redesenho da linha.
+let EDIT_ID = null, EDIT_BUF = null;
+
+function optDestino(x){
+  return /receita/.test(x.tipo)
+    ? D.moradores.map(m=>`<option value="${esc(m.apto)}" ${m.apto===x.destino?'selected':''}>${esc(m.apto)} · ${esc(m.nome)}</option>`).join('')
+    : D.categorias.map(c=>`<option ${c===x.destino?'selected':''}>${esc(c)}</option>`).join('');
+}
+function rowLancLeitura(x){
+  return `<tr data-id="${esc(x.id)}">
+    <td>${fmtData(x.data)}</td>
+    <td class="desc">${esc(x.descricao)}</td>
+    <td style="text-align:left">${/receita/.test(x.tipo)?`Apto ${esc(x.destino)} · ${esc(x.mesRef)}`:esc(x.destino)}</td>
+    <td class="${/receita/.test(x.tipo)?'rec':'desp'}">${/receita/.test(x.tipo)?'+':'−'} ${fmtN(x.valor)}</td>
+    <td class="acao edit-only"><button class="ed" title="Editar">✎</button><button class="x" title="Excluir">×</button></td>
+  </tr>`;
+}
+function rowLancEdicao(x){
+  const rec = /receita/.test(x.tipo);
+  return `<tr data-id="${esc(x.id)}" class="editando">
+    <td><input type="date" data-e="data" value="${esc(x.data)}"></td>
+    <td class="desc"><input type="text" data-e="descricao" value="${esc(x.descricao)}"></td>
+    <td style="text-align:left" class="campos-destino">
+      <select class="inline" data-e="tipo"><option value="receita" ${rec?'selected':''}>Cota</option><option value="despesa" ${rec?'':'selected'}>Despesa</option></select>
+      <select class="inline" data-e="destino"><option value="">Escolher…</option>${optDestino(x)}</select>
+      ${rec?`<select class="inline" data-e="mesRef">${MESES.map(m=>`<option ${m===x.mesRef?'selected':''}>${m}</option>`).join('')}</select>`:''}
+    </td>
+    <td><input type="number" step="0.01" data-e="valor" value="${x.valor}"></td>
+    <td class="acao edit-only"><button class="ok" title="Salvar">✓</button><button class="x" data-cancelar="1" title="Cancelar">×</button></td>
+  </tr>`;
+}
 function renderLanc(){
   const L = doAno().slice().sort((a,b)=>b.data.localeCompare(a.data));
   $('#lanc-status').textContent = `${L.length} lançamentos`;
   if(!L.length){ $('#tbl-lanc').innerHTML = `<tr><td class="empty" style="text-align:center">Nenhum lançamento em ${ANO}.</td></tr>`; return; }
   $('#tbl-lanc').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left">Descrição</th><th style="text-align:left">Destino</th><th>Valor</th><th class="edit-only"></th></tr></thead>
-  <tbody>${L.map(x=>`<tr data-id="${esc(x.id)}"><td>${fmtData(x.data)}</td><td class="desc">${esc(x.descricao)}</td><td style="text-align:left">${/receita/.test(x.tipo)?`Apto ${esc(x.destino)} · ${esc(x.mesRef)}`:esc(x.destino)}</td><td class="${/receita/.test(x.tipo)?'rec':'desp'}">${/receita/.test(x.tipo)?'+':'−'} ${fmtN(x.valor)}</td><td class="acao edit-only"><button class="x" title="Excluir">×</button></td></tr>`).join('')}</tbody>`;
+  <tbody>${L.map(x => x.id===EDIT_ID ? rowLancEdicao(EDIT_BUF) : rowLancLeitura(x)).join('')}</tbody>`;
+
+  // Rascunho acompanha cada tecla; trocar o tipo zera o destino, porque a
+  // lista de aptos e a de categorias nao se misturam.
+  $('#tbl-lanc').oninput = e => {
+    const k = e.target.dataset.e; if(!k || !EDIT_BUF) return;
+    EDIT_BUF[k] = e.target.type==='number' ? Number(e.target.value)||0 : e.target.value;
+    if(k==='tipo'){ EDIT_BUF.destino=''; if(EDIT_BUF.tipo==='despesa') delete EDIT_BUF.mesRef; else EDIT_BUF.mesRef = EDIT_BUF.mesRef || MESES[+String(EDIT_BUF.data).slice(5,7)-1]; renderLanc(); }
+  };
+
   $('#tbl-lanc').onclick = async e => {
-    const b = e.target.closest('button.x'); if(!b||!CAN_WRITE) return;
-    const id = b.closest('tr').dataset.id; const l = D.lancamentos.find(x=>x.id===id);
-    if(!confirm(`Excluir "${l.descricao}" de ${fmtN(l.valor)}?`)) return;
-    try { await salvar(d=>{ d.lancamentos = d.lancamentos.filter(x=>x.id!==id); }, `Exclui lançamento ${id}`); toast('Lançamento excluído'); } catch(err){ toast(err.message,true); }
+    const btn = e.target.closest('button'); if(!btn || !CAN_WRITE) return;
+    const tr = btn.closest('tr'); const id = tr.dataset.id;
+
+    if(btn.classList.contains('ed')){ EDIT_ID = id; EDIT_BUF = { ...D.lancamentos.find(x=>x.id===id) }; renderLanc(); return; }
+    if(btn.dataset.cancelar){ EDIT_ID = null; EDIT_BUF = null; renderLanc(); return; }
+
+    if(btn.classList.contains('ok')){
+      const b = EDIT_BUF;
+      if(!b.data || !b.destino){ toast('Preencha data e destino', true); return; }
+      if(!(b.valor > 0)){ toast('Valor deve ser maior que zero', true); return; }
+      const editado = { ...b, valor: r2(Math.abs(b.valor)), mesRef: /receita/.test(b.tipo) ? (b.mesRef || MESES[+b.data.slice(5,7)-1]) : MESES[+b.data.slice(5,7)-1] };
+      // Sai do modo de edicao ANTES de gravar: salvar() redesenha a tabela ao
+      // final, e a linha voltaria a aparecer como formulario.
+      EDIT_ID = null; EDIT_BUF = null;
+      try {
+        await salvar(d => { const i = d.lancamentos.findIndex(x=>x.id===id); if(i>=0) d.lancamentos[i] = editado; }, `Edita lançamento ${id}`);
+        toast('Lançamento atualizado');
+      } catch(err){ EDIT_ID = id; EDIT_BUF = b; renderLanc(); toast(err.message, true); }
+      return;
+    }
+
+    if(btn.classList.contains('x')){
+      const l = D.lancamentos.find(x=>x.id===id);
+      if(!confirm(`Excluir "${l.descricao}" de ${fmtN(l.valor)}?`)) return;
+      try { await salvar(d=>{ d.lancamentos = d.lancamentos.filter(x=>x.id!==id); }, `Exclui lançamento ${id}`); toast('Lançamento excluído'); } catch(err){ toast(err.message,true); }
+    }
   };
 }
 
@@ -588,6 +658,14 @@ async function lerArquivo(file){
   $('#imp-toolbar').hidden=false; $('#imp-card').hidden=false;
   renderImport();
 }
+// Transacoes identicas no mesmo dia (dois PIX iguais do mesmo pagador) geram
+// o mesmo hash e a segunda seria descartada como "ja lancada". O sufixo de
+// ocorrencia mantem cada uma com identidade propria.
+function idsUnicos(out){
+  const vistos = {};
+  for(const t of out){ const n = (vistos[t.id] = (vistos[t.id]||0) + 1); if(n > 1) t.id = hash(t.id + '#' + n); }
+  return out;
+}
 function parseOFX(txt){
   const out=[]; const blocks = txt.match(/<STMTTRN>[\s\S]*?(?=<\/STMTTRN>|<STMTTRN>|<\/BANKTRANLIST>)/gi)||[];
   const tag=(b,t)=>{ const m=b.match(new RegExp(`<${t}>([^<\\r\\n]*)`,'i')); return m?m[1].trim():''; };
@@ -596,7 +674,7 @@ function parseOFX(txt){
     const data=`${dt.slice(0,4)}-${dt.slice(4,6)}-${dt.slice(6,8)}`; const desc=[tag(b,'NAME'),tag(b,'MEMO')].filter(Boolean).join(' — ');
     out.push({id: tag(b,'FITID')||hash(data+desc+amt), data, descricao:desc, valor:Math.abs(amt), credito:amt>0});
   }
-  return out;
+  return idsUnicos(out);
 }
 function parseCSV(txt){
   const lines=txt.split(/\r?\n/).filter(l=>l.trim()); if(lines.length<2) return [];
@@ -629,7 +707,7 @@ function parseCSV(txt){
     if(/SALDO/i.test(descricao)&&!/PIX|TED|TRANSF/i.test(descricao)) continue;
     out.push({id:hash(data+descricao+valor+(credito?'C':'D')), data, descricao, valor, credito});
   }
-  return out;
+  return idsUnicos(out);
 }
 // O nome no extrato quase nunca bate por inteiro com o cadastro: o banco
 // abrevia, corta sobrenome, inverte a ordem ou junta com o tipo da operacao
