@@ -94,6 +94,7 @@ input[type=number]{text-align:right}
 .card + .card{margin-top:14px}
 .card h2{padding:15px 18px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .card h2 .status{font-weight:600}
+.card h2 .h2-dir{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .scroll{overflow-x:auto}
 
 /* ══ TABELA ══ */
@@ -263,7 +264,7 @@ body.ro .edit-only{display:none!important}
 
   <section id="tab-lancamentos" hidden>
     <div class="card">
-      <h2>Lançamentos do ano <span class="status" id="lanc-status"></span></h2>
+      <h2>Lançamentos do ano <span class="h2-dir"><span class="status" id="lanc-status"></span><button class="btn secondary small edit-only" id="btn-limpar-lanc">Excluir todos</button></span></h2>
       <div class="scroll"><table id="tbl-lanc"></table></div>
     </div>
   </section>
@@ -416,6 +417,22 @@ async function entrar(){
 $('#login-btn').onclick = ()=>{ const e=$('#login-email').value.trim(); if(!e) return; setEmail(e); entrar(); };
 $('#login-email').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#login-btn').click(); });
 $('#btn-sair').onclick = ()=>{ localStorage.removeItem('cast_email'); location.reload(); };
+// Acao destrutiva e irreversivel: alem do confirm, exige a palavra digitada.
+// So os lancamentos vao embora — moradores, regras, categorias e saldo ficam.
+$('#btn-limpar-lanc').onclick = async ()=>{
+  if(!CAN_WRITE || !D) return;
+  const total = (D.lancamentos||[]).length;
+  if(!total){ toast('Não há lançamentos para excluir'); return; }
+  const porAno = {}; D.lancamentos.forEach(l=>{ const a=String(l.data).slice(0,4); porAno[a]=(porAno[a]||0)+1; });
+  const resumo = Object.keys(porAno).sort().map(a=>`${a}: ${porAno[a]}`).join(' · ');
+  if(!confirm(`Excluir TODOS os ${total} lançamentos?\n\n${resumo}\n\nMoradores, regras, categorias e saldo inicial são preservados.\nNão há como desfazer.`)) return;
+  if(String(prompt('Para confirmar, digite EXCLUIR:')||'').trim().toUpperCase() !== 'EXCLUIR'){ toast('Exclusão cancelada'); return; }
+  try {
+    EDIT_ID = null; EDIT_BUF = null;
+    await salvar(d=>{ d.lancamentos = []; }, `Exclui todos os lançamentos (${total})`);
+    toast(`${total} lançamentos excluídos`);
+  } catch(e){ toast(e.message, true); }
+};
 $('#btn-reload').onclick = async ()=>{ try{ D = await carregar(); renderTudo(); toast('Atualizado'); }catch(e){ toast(e.message,true);} };
 $('#ano').onchange = e => { ANO = +e.target.value; renderTudo(); };
 $('#tabs').addEventListener('click', e => {
