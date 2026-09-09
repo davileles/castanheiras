@@ -10,17 +10,14 @@
 :root{
   --bg:#EEF1F4; --surface:#FFFFFF; --ink:#1B2A41; --muted:#6B7683; --line:#D8DEE4;
   --rec:#2E7D5B; --rec-soft:#E3F1EA; --desp:#B54A3A; --desp-soft:#F6E5E1; --warn:#B7791F; --warn-soft:#FBF1DC;
-  --focus:#1B2A41;
 }
 *{box-sizing:border-box}
 html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Instrument Sans",system-ui,sans-serif;font-feature-settings:"tnum" 1}
 button,input,select{font:inherit;color:inherit}
 button{cursor:pointer}
-:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+:focus-visible{outline:2px solid var(--ink);outline-offset:2px}
 a{color:inherit}
 .wrap{max-width:1120px;margin:0 auto;padding:0 20px 64px}
-
-/* Cabeçalho */
 header{background:var(--surface);border-bottom:1px solid var(--line)}
 header .wrap{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding-top:28px;padding-bottom:0}
 h1{margin:0;font-size:22px;font-weight:600;letter-spacing:-.01em}
@@ -34,19 +31,15 @@ nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)
 .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:22px 0 14px}
 .toolbar .grow{flex:1}
 .status{font-size:13px;color:var(--muted)}
-
-/* Botões */
 .btn{background:var(--ink);color:#fff;border:1px solid var(--ink);border-radius:6px;padding:8px 14px;font-weight:500}
 .btn.secondary{background:var(--surface);color:var(--ink);border-color:var(--line)}
 .btn.small{padding:5px 10px;font-size:13px}
 .btn:disabled{opacity:.5;cursor:default}
-input[type=text],input[type=number],select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:0}
+input[type=text],input[type=number],input[type=password],select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:0}
 input[type=number]{text-align:right}
-
-/* Tabelas */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
 .card + .card{margin-top:18px}
-.card h2{margin:0;padding:14px 16px;font-size:15px;font-weight:600;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}
+.card h2{margin:0;padding:14px 16px;font-size:15px;font-weight:600;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
 .card h2 .status{font-weight:400}
 .scroll{overflow-x:auto}
 table{border-collapse:collapse;width:100%;font-size:14px}
@@ -57,17 +50,14 @@ th:first-child{background:#F7F9FA}
 tr:last-child td{border-bottom:0}
 tfoot td{font-weight:600;border-top:1px solid var(--ink);background:#F7F9FA}
 td.zero{color:#B9C0C8}
-td.rec{color:var(--rec)} td.desp{color:var(--desp)}
-td.neg{color:var(--desp)}
-td.edit{cursor:pointer}
-td.edit:hover{background:#F2F5F8}
+td.rec{color:var(--rec)} td.desp{color:var(--desp)} td.neg{color:var(--desp)}
+td.edit{cursor:pointer} td.edit:hover{background:#F2F5F8}
+body.ro td.edit{cursor:default} body.ro td.edit:hover{background:inherit}
 td.pend{background:var(--desp-soft);color:var(--desp)}
 td.pago{background:var(--rec-soft);color:var(--rec)}
 td.mes-atual{box-shadow:inset 0 2px 0 var(--ink)}
-
-/* Resumo: barras por mês */
 .meses{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;padding:16px;align-items:end;height:190px}
-.mes{display:flex;flex-direction:column;justify-content:flex-end;gap:3px;height:100%;position:relative}
+.mes{display:flex;flex-direction:column;justify-content:flex-end;gap:3px;height:100%}
 .mes .bar{width:100%;display:flex;gap:2px;align-items:flex-end;flex:1}
 .mes .bar i{flex:1;border-radius:2px 2px 0 0;min-height:1px}
 .mes .bar i.r{background:var(--rec)} .mes .bar i.d{background:var(--desp)}
@@ -75,9 +65,7 @@ td.mes-atual{box-shadow:inset 0 2px 0 var(--ink)}
 .legend{display:flex;gap:16px;padding:0 16px 14px;font-size:13px;color:var(--muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
 .legend .r{background:var(--rec)} .legend .d{background:var(--desp)}
-
-/* Importação */
-.drop{border:1.5px dashed var(--line);border-radius:8px;padding:28px;text-align:center;background:var(--surface);color:var(--muted)}
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:28px;text-align:center;background:var(--surface);color:var(--muted);display:block}
 .drop.over{border-color:var(--ink);color:var(--ink)}
 .drop input{display:none}
 .drop strong{color:var(--ink);font-weight:500}
@@ -90,39 +78,51 @@ select.inline{padding:4px 6px;font-size:13px;max-width:240px}
 .result{padding:14px 16px;font-size:14px}
 .result ul{margin:8px 0 0;padding-left:18px;color:var(--muted)}
 .empty{padding:28px 16px;color:var(--muted);text-align:center}
-
-/* Cadastros */
 td input[type=text]{width:100%;min-width:120px} td input.apto{min-width:60px;width:70px} td input[type=number]{width:100px}
 td.acao{text-align:center;width:40px}
 .x{background:none;border:0;color:var(--muted);font-size:16px;line-height:1;padding:4px 8px;border-radius:4px}
 .x:hover{background:var(--desp-soft);color:var(--desp)}
-
-/* Toast */
+body.ro .edit-only{display:none!important}
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:6px;font-size:14px;opacity:0;transition:.2s;pointer-events:none;max-width:90vw}
 #toast.show{opacity:1;transform:translateX(-50%)}
 #toast.err{background:var(--desp)}
-
+/* Login */
+#login{max-width:440px;margin:60px auto;padding:0 20px}
+#login .card{padding:24px}
+#login p{margin:0 0 14px;color:var(--muted)}
+#login input{width:100%;margin-bottom:12px}
 @media (max-width:720px){
   header .wrap{flex-direction:column;align-items:stretch;gap:8px}
   .saldo{text-align:left}
-  .meses{height:140px;gap:3px}
-  .mes label{font-size:9px}
+  .meses{height:140px;gap:3px} .mes label{font-size:9px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
 
+<div id="login" hidden>
+  <div class="card">
+    <h1 style="margin-bottom:6px">Edifício Castanheiras</h1>
+    <p>Informe a chave de acesso às contas do condomínio. Ela fica salva só neste navegador.</p>
+    <input type="password" id="login-token" placeholder="Chave de acesso" autocomplete="off">
+    <button class="btn" id="login-btn">Entrar</button>
+    <p class="status" id="login-msg" style="margin:12px 0 0"></p>
+  </div>
+</div>
+
+<div id="app" hidden>
 <header>
   <div class="wrap">
     <div>
-      <h1 id="titulo">Edifício Castanheiras <small id="subtitulo">Demonstrativo financeiro</small></h1>
+      <h1>Edifício Castanheiras <small id="subtitulo">Contas do condomínio</small></h1>
       <nav role="tablist" id="tabs">
         <button role="tab" data-tab="resumo" aria-selected="true">Resumo</button>
         <button role="tab" data-tab="cotas">Cotas</button>
         <button role="tab" data-tab="despesas">Despesas</button>
-        <button role="tab" data-tab="importar">Importar extrato</button>
-        <button role="tab" data-tab="cadastros">Moradores e regras</button>
+        <button role="tab" data-tab="lancamentos">Lançamentos</button>
+        <button role="tab" data-tab="importar" class="edit-only">Importar extrato</button>
+        <button role="tab" data-tab="cadastros" class="edit-only">Moradores e regras</button>
       </nav>
     </div>
     <div class="saldo">
@@ -134,46 +134,46 @@ td.acao{text-align:center;width:40px}
 
 <main class="wrap">
   <div class="toolbar">
-    <span class="status" id="status">Carregando planilha…</span>
+    <span class="status" id="status"></span>
     <span class="grow"></span>
-    <a class="btn secondary small" id="link-planilha" target="_blank" rel="noopener">Abrir planilha</a>
+    <label class="status">Ano <select id="ano" class="inline"></select></label>
     <button class="btn secondary small" id="btn-reload">Atualizar</button>
+    <button class="btn secondary small" id="btn-sair">Sair</button>
   </div>
 
-  <!-- RESUMO -->
   <section id="tab-resumo">
     <div class="card">
-      <h2>Receitas e despesas por mês <span class="status" id="resumo-ano"></span></h2>
+      <h2>Receitas e despesas por mês</h2>
       <div class="meses" id="meses"></div>
       <div class="legend"><span><i class="r"></i>Receitas</span><span><i class="d"></i>Despesas</span></div>
     </div>
     <div class="card">
-      <h2>Resumo financeiro</h2>
+      <h2>Demonstrativo financeiro <span class="status edit-only">Saldo inicial do ano: <a href="#" id="saldo-ini">definir</a></span></h2>
       <div class="scroll"><table id="tbl-resumo"></table></div>
-    </div>
-    <div class="card">
-      <h2>Últimos lançamentos importados</h2>
-      <div class="scroll"><table id="tbl-ultimos"></table></div>
     </div>
   </section>
 
-  <!-- COTAS -->
   <section id="tab-cotas" hidden>
     <div class="card">
-      <h2>Cotas condominiais por apartamento <span class="status">Clique numa célula para registrar ou corrigir um valor</span></h2>
+      <h2>Cotas condominiais por apartamento <span class="status edit-only">Clique numa célula para registrar ou corrigir um pagamento</span></h2>
       <div class="scroll"><table id="tbl-cotas"></table></div>
     </div>
   </section>
 
-  <!-- DESPESAS -->
   <section id="tab-despesas" hidden>
     <div class="card">
-      <h2>Despesas por categoria <span class="status">Clique numa célula para registrar ou corrigir um valor</span></h2>
+      <h2>Despesas por categoria <span class="status edit-only">Clique numa célula para registrar uma despesa</span></h2>
       <div class="scroll"><table id="tbl-despesas"></table></div>
     </div>
   </section>
 
-  <!-- IMPORTAR -->
+  <section id="tab-lancamentos" hidden>
+    <div class="card">
+      <h2>Lançamentos do ano <span class="status" id="lanc-status"></span></h2>
+      <div class="scroll"><table id="tbl-lanc"></table></div>
+    </div>
+  </section>
+
   <section id="tab-importar" hidden>
     <label class="drop" id="drop">
       <input type="file" id="file" accept=".ofx,.csv,.txt,.qfx">
@@ -183,39 +183,38 @@ td.acao{text-align:center;width:40px}
     <div class="toolbar" id="imp-toolbar" hidden>
       <span class="status" id="imp-status"></span>
       <span class="grow"></span>
-      <label class="status">Mês de referência das cotas:
-        <select id="imp-mesref" class="inline"></select>
-      </label>
-      <button class="btn" id="btn-lancar">Lançar na planilha</button>
+      <label class="status">Mês de referência das cotas: <select id="imp-mesref" class="inline"></select></label>
+      <button class="btn" id="btn-lancar">Lançar</button>
     </div>
-    <div class="card" id="imp-card" hidden>
-      <div class="scroll"><table id="tbl-import"></table></div>
-    </div>
-    <div class="card" id="imp-result" hidden><div class="result" id="imp-result-body"></div></div>
+    <div class="card" id="imp-card" hidden><div class="scroll"><table id="tbl-import"></table></div></div>
   </section>
 
-  <!-- CADASTROS -->
   <section id="tab-cadastros" hidden>
     <div class="card">
       <h2>Moradores <span><button class="btn secondary small" id="btn-add-morador">Adicionar</button> <button class="btn small" id="btn-save-moradores">Salvar moradores</button></span></h2>
       <div class="scroll"><table id="tbl-moradores"></table></div>
-      <div class="result status">Nome e apelidos são usados para reconhecer o pagador no extrato. Separe apelidos por vírgula (ex.: "Maria Silva, M SILVA, MARIA S").</div>
+      <div class="result status">Nome e apelidos são usados para reconhecer o pagador no extrato. Separe apelidos por vírgula.</div>
     </div>
     <div class="card">
       <h2>Regras de despesas <span><button class="btn secondary small" id="btn-add-regra">Adicionar</button> <button class="btn small" id="btn-save-regras">Salvar regras</button></span></h2>
       <div class="scroll"><table id="tbl-regras"></table></div>
       <div class="result status">Se a descrição do débito contiver a palavra-chave, ele é classificado na categoria escolhida.</div>
     </div>
+    <div class="card">
+      <h2>Categorias de despesa <span><button class="btn secondary small" id="btn-add-cat">Adicionar</button> <button class="btn small" id="btn-save-cats">Salvar categorias</button></span></h2>
+      <div class="scroll"><table id="tbl-cats"></table></div>
+    </div>
   </section>
 </main>
+</div>
 
 <div id="toast" role="status"></div>
 
 <script>
 // ================== CONFIGURAÇÃO ==================
-const APPS_SCRIPT_URL = 'COLE_AQUI_A_URL_DO_APPS_SCRIPT/exec';
-const PLANILHA_URL = 'https://docs.google.com/spreadsheets/d/1PmMk6s78WUhe1p0hu1iruvNUqwFpLrQfUilDwDsoeKk/edit';
+const GH = { owner: 'davileles', repo: 'castanheiras-dados', path: 'dados.json', branch: 'main' };
 const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+const ROW_NO_MES = '1.2 - Cotas condominiais', ROW_ATRASO = '1.1 - Cotas em atraso';
 // ==================================================
 
 const $ = s => document.querySelector(s);
@@ -223,318 +222,340 @@ const fmt = n => (n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'}
 const fmtN = n => (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
 const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-let D = null;           // dados da planilha
-let IMP = [];           // lançamentos parseados do extrato
+const r2 = n => Math.round(n*100)/100;
+let D = null, SHA = null, ANO = new Date().getFullYear(), CAN_WRITE = false, IMP = [];
 const hoje = new Date();
-const mesAtualIdx = hoje.getMonth();
-
-$('#link-planilha').href = PLANILHA_URL;
 
 function toast(msg, err){ const t=$('#toast'); t.textContent=msg; t.className='show'+(err?' err':''); clearTimeout(t._t); t._t=setTimeout(()=>t.className='',3500); }
 function setStatus(msg){ $('#status').textContent = msg; }
 
-// ---------- API ----------
-async function apiGet(action){
-  const r = await fetch(`${APPS_SCRIPT_URL}?action=${action}`, {redirect:'follow'});
-  const j = await r.json(); if(!j.ok) throw new Error(j.error); return j.data;
+// ---------- Acesso ----------
+function getToken(){ return localStorage.getItem('cast_token') || ''; }
+(function tokenFromHash(){ const m = location.hash.match(/[#&]k=([^&]+)/); if(m){ localStorage.setItem('cast_token', decodeURIComponent(m[1])); history.replaceState(null,'',location.pathname+location.search); } })();
+
+const ghHeaders = () => ({ 'Authorization': 'Bearer ' + getToken(), 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' });
+const apiBase = `https://api.github.com/repos/${GH.owner}/${GH.repo}`;
+
+async function ghLoad(){
+  const r = await fetch(`${apiBase}/contents/${GH.path}?ref=${GH.branch}&t=${Date.now()}`, { headers: ghHeaders(), cache:'no-store' });
+  if (r.status === 401) throw new Error('Chave inválida ou expirada');
+  if (r.status === 404) throw new Error('Arquivo de dados não encontrado no repositório');
+  if (!r.ok) throw new Error('GitHub respondeu ' + r.status);
+  const j = await r.json();
+  SHA = j.sha;
+  const txt = new TextDecoder().decode(Uint8Array.from(atob(j.content.replace(/\n/g,'')), c=>c.charCodeAt(0)));
+  return JSON.parse(txt);
 }
-async function apiPost(body){
-  const r = await fetch(APPS_SCRIPT_URL, {method:'POST', redirect:'follow', body: JSON.stringify(body)});
-  const j = await r.json(); if(!j.ok) throw new Error(j.error); return j.data;
+async function ghPerms(){
+  try { const r = await fetch(apiBase, { headers: ghHeaders() }); const j = await r.json(); return !!(j.permissions && j.permissions.push); } catch { return false; }
+}
+/** Aplica `mutator(D)` sobre a versão mais recente e grava. Refaz em caso de conflito. */
+async function salvar(mutator, mensagem){
+  if(!CAN_WRITE) throw new Error('Acesso somente leitura');
+  for (let tentativa = 0; tentativa < 3; tentativa++) {
+    const fresh = await ghLoad();
+    mutator(fresh);
+    fresh.atualizadoEm = new Date().toISOString();
+    const content = btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(fresh, null, 1))));
+    const r = await fetch(`${apiBase}/contents/${GH.path}`, { method:'PUT', headers: ghHeaders(), body: JSON.stringify({ message: mensagem, content, sha: SHA, branch: GH.branch }) });
+    if (r.status === 409) continue;
+    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.message || ('Falha ao gravar: ' + r.status)); }
+    const j = await r.json(); SHA = j.content.sha; D = fresh; renderTudo();
+    return;
+  }
+  throw new Error('Conflito ao gravar — tente novamente');
 }
 
-async function carregar(){
-  if (APPS_SCRIPT_URL.startsWith('COLE_AQUI')) { setStatus('Configure APPS_SCRIPT_URL no index.html'); return; }
-  setStatus('Carregando planilha…');
+async function entrar(){
+  if(!getToken()){ $('#login').hidden=false; $('#app').hidden=true; return; }
+  $('#login-msg').textContent='Verificando…';
   try {
-    D = await apiGet('dados');
+    D = await ghLoad();
+    CAN_WRITE = await ghPerms();
+    document.body.classList.toggle('ro', !CAN_WRITE);
+    $('#login').hidden=true; $('#app').hidden=false;
+    const anos = [...new Set(D.lancamentos.map(l=>+l.data.slice(0,4)).concat([hoje.getFullYear()]))].sort();
+    $('#ano').innerHTML = anos.map(a=>`<option ${a===ANO?'selected':''}>${a}</option>`).join('');
+    if(!anos.includes(ANO)) ANO = anos[anos.length-1];
     renderTudo();
-    setStatus(`Planilha lida às ${hoje.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`);
-  } catch(e){ setStatus('Falha ao ler a planilha: ' + e.message); toast(e.message, true); }
+    setStatus(CAN_WRITE ? 'Acesso de edição' : 'Somente consulta');
+  } catch(e){ $('#login-msg').textContent = e.message; $('#login').hidden=false; $('#app').hidden=true; if(/inválida|401/.test(e.message)) localStorage.removeItem('cast_token'); }
 }
-
-// ---------- Abas ----------
+$('#login-btn').onclick = ()=>{ const t=$('#login-token').value.trim(); if(!t) return; localStorage.setItem('cast_token', t); entrar(); };
+$('#login-token').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#login-btn').click(); });
+$('#btn-sair').onclick = ()=>{ localStorage.removeItem('cast_token'); location.reload(); };
+$('#btn-reload').onclick = async ()=>{ try{ D = await ghLoad(); renderTudo(); toast('Atualizado'); }catch(e){ toast(e.message,true);} };
+$('#ano').onchange = e => { ANO = +e.target.value; renderTudo(); };
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if(!b) return;
   document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-selected', x===b));
   document.querySelectorAll('main section').forEach(s=>s.hidden = s.id !== 'tab-'+b.dataset.tab);
 });
-$('#btn-reload').onclick = carregar;
+
+// ---------- Cálculo ----------
+const mesIdx = m => MESES.indexOf(String(m||'').toUpperCase());
+const mesPag = l => +l.data.slice(5,7) - 1;
+const doAno = () => D.lancamentos.filter(l => l.data.startsWith(String(ANO)));
+
+function calc(){
+  const L = doAno();
+  const rec = Array(12).fill(0), desp = Array(12).fill(0), noMes = Array(12).fill(0), atraso = Array(12).fill(0);
+  const cotas = {}, despCat = {};
+  D.moradores.forEach(m => cotas[m.apto] = Array(12).fill(0));
+  D.categorias.forEach(c => despCat[c] = Array(12).fill(0));
+  for (const l of L) {
+    const mp = mesPag(l);
+    if (l.tipo === 'receita') {
+      rec[mp] += l.valor;
+      const mr = mesIdx(l.mesRef) >= 0 ? mesIdx(l.mesRef) : mp;
+      (mr === mp ? noMes : atraso)[mp] += l.valor;
+      if (!cotas[l.destino]) cotas[l.destino] = Array(12).fill(0);
+      cotas[l.destino][mr] += l.valor;
+    } else {
+      desp[mp] += l.valor;
+      if (!despCat[l.destino]) despCat[l.destino] = Array(12).fill(0);
+      despCat[l.destino][mp] += l.valor;
+    }
+  }
+  const ini = (D.saldoInicial||{})[ANO];
+  const saldoAnt = [], saldo = [];
+  let s = ini;
+  for (let i=0;i<12;i++){ saldoAnt.push(s); if (s !== undefined && s !== null) s = r2(s + rec[i] - desp[i]); saldo.push(s); }
+  let ult = -1; for (let i=0;i<12;i++) if (rec[i]||desp[i]) ult = i;
+  return { rec, desp, noMes, atraso, cotas, despCat, saldoAnt, saldo, ult, temIni: ini !== undefined && ini !== null };
+}
 
 // ---------- Render ----------
 function renderTudo(){
-  $('#subtitulo').textContent = `Demonstrativo financeiro ${D.ano}`;
-  $('#resumo-ano').textContent = D.ano;
-  renderResumo(); renderCotas(); renderDespesas(); renderCadastros(); renderUltimos();
-  fillMesRef();
+  $('#subtitulo').textContent = `Contas do condomínio · ${ANO}`;
+  renderResumo(); renderCotas(); renderDespesas(); renderLanc(); renderCadastros(); fillMesRef();
 }
-
-function totais(){
-  const rec = MESES.map((_,i)=>D.receitas.reduce((s,r)=>s+(r.meses[i]||0),0));
-  const desp = MESES.map((_,i)=>D.despesas.reduce((s,r)=>s+(r.meses[i]||0),0));
-  return {rec, desp};
-}
+const thMeses = () => MESES.map((m,i)=>`<th class="${i===hoje.getMonth()&&ANO===hoje.getFullYear()?'mes-atual':''}">${m}</th>`).join('');
+const tdVals = (vals, cls) => vals.map(v=>{ v=v||0; return `<td class="${v===0?'zero':(cls||(v<0?'neg':''))}">${v===0?'—':fmtN(v)}</td>`; }).join('');
 
 function renderResumo(){
-  const {rec, desp} = totais();
-  const saldoRow = Object.keys(D.resumo).find(k=>/SALDO ATUAL/i.test(k));
-  const antRow = Object.keys(D.resumo).find(k=>/Anterior/i.test(k));
-  const saldo = saldoRow ? D.resumo[saldoRow] : [];
-  // último mês com movimento
-  let ult = -1; for(let i=0;i<12;i++) if(rec[i]||desp[i]) ult=i;
-  const idx = ult>=0 ? ult : 0;
-  $('#saldo').textContent = fmt(saldo[idx]||0);
-  $('#saldo-label').textContent = `Saldo em ${MESES[idx]} ${D.ano}`;
-
-  const max = Math.max(1,...rec,...desp);
-  $('#meses').innerHTML = MESES.map((m,i)=>`
-    <div class="mes" title="${m}: receitas ${fmt(rec[i])} · despesas ${fmt(desp[i])}">
-      <div class="bar"><i class="r" style="height:${rec[i]/max*100}%"></i><i class="d" style="height:${desp[i]/max*100}%"></i></div>
-      <label>${m}</label>
-    </div>`).join('');
-
+  const C = calc();
+  const idx = C.ult >= 0 ? C.ult : 0;
+  $('#saldo').textContent = C.temIni ? fmt(C.saldo[idx]) : '—';
+  $('#saldo-label').textContent = C.temIni ? `Saldo em ${MESES[idx]} ${ANO}` : `Saldo inicial de ${ANO} não definido`;
+  $('#saldo-ini').textContent = C.temIni ? fmt((D.saldoInicial||{})[ANO]) : 'definir';
+  const max = Math.max(1,...C.rec,...C.desp);
+  $('#meses').innerHTML = MESES.map((m,i)=>`<div class="mes" title="${m}: receitas ${fmt(C.rec[i])} · despesas ${fmt(C.desp[i])}"><div class="bar"><i class="r" style="height:${C.rec[i]/max*100}%"></i><i class="d" style="height:${C.desp[i]/max*100}%"></i></div><label>${m}</label></div>`).join('');
+  const tot = a => a.reduce((s,v)=>s+(v||0),0);
   const linhas = [
-    ['Saldo do mês anterior', antRow ? D.resumo[antRow] : []],
-    ['Receitas', rec, 'rec'],
-    ['Despesas', desp, 'desp'],
-    ['Resultado do mês', MESES.map((_,i)=>rec[i]-desp[i])],
-    ['Saldo atual', saldo],
+    ['Saldo do mês anterior', C.saldoAnt.map(v=>v??0)],
+    [ROW_ATRASO, C.atraso, 'rec'], [ROW_NO_MES, C.noMes, 'rec'],
+    ['Total das receitas', C.rec, 'rec'],
+    ...D.categorias.map(c=>[c, C.despCat[c]||Array(12).fill(0), 'desp']),
+    ['Total das despesas', C.desp, 'desp'],
+    ['Resultado do mês', MESES.map((_,i)=>r2(C.rec[i]-C.desp[i]))],
+    ['Saldo atual', C.saldo.map(v=>v??0)],
   ];
-  $('#tbl-resumo').innerHTML = `<thead><tr><th></th>${MESES.map((m,i)=>`<th class="${i===mesAtualIdx?'mes-atual':''}">${m}</th>`).join('')}</tr></thead>
-  <tbody>${linhas.map(([lab,vals,cls])=>`<tr><td>${lab}</td>${MESES.map((_,i)=>{
-    const v=vals[i]||0; return `<td class="${v===0?'zero':(cls||(v<0?'neg':''))}">${v===0?'—':fmtN(v)}</td>`;}).join('')}</tr>`).join('')}</tbody>`;
+  $('#tbl-resumo').innerHTML = `<thead><tr><th></th>${thMeses()}<th>Total</th></tr></thead><tbody>${linhas.map(([lab,vals,cls])=>{
+    const total = /^Saldo/.test(lab) ? '' : fmtN(tot(vals));
+    return `<tr><td${/^Total|^Saldo atual/.test(lab)?' style="font-weight:600"':''}>${esc(lab)}</td>${tdVals(vals,cls)}<td><b>${total}</b></td></tr>`;}).join('')}</tbody>`;
 }
+$('#saldo-ini').onclick = async e => {
+  e.preventDefault();
+  const s = prompt(`Saldo em caixa no início de ${ANO} (R$):`, fmtN((D.saldoInicial||{})[ANO]||0)); if(s===null) return;
+  try { await salvar(d=>{ d.saldoInicial = d.saldoInicial||{}; d.saldoInicial[ANO] = parseBR(s); }, `Saldo inicial ${ANO}`); toast('Saldo inicial salvo'); } catch(err){ toast(err.message,true); }
+};
 
 function renderCotas(){
-  const cotaPadrao = apto => (D.moradores.find(m=>m.apto===apto)||{}).valorCota || 0;
-  const totalMes = MESES.map((_,i)=>D.cotas.reduce((s,c)=>s+(c.meses[i]||0),0));
-  $('#tbl-cotas').innerHTML = `<thead><tr><th>Apto</th>${MESES.map((m,i)=>`<th class="${i===mesAtualIdx?'mes-atual':''}">${m}</th>`).join('')}<th>Total</th></tr></thead>
-  <tbody>${D.cotas.map(c=>{
-    const nome = (D.moradores.find(m=>m.apto===c.apto)||{}).nome;
-    const tot = c.meses.reduce((s,v)=>s+v,0);
-    return `<tr><td><b>${c.apto}</b>${nome?` <span class="status">${esc(nome.split(' ')[0])}</span>`:''}</td>${MESES.map((m,i)=>{
-      const v=c.meses[i]||0;
-      const vencido = i<=mesAtualIdx && D.ano<=hoje.getFullYear();
-      const cls = v>0 ? (v < cotaPadrao(c.apto) ? 'pend' : 'pago') : (vencido ? 'pend' : 'zero');
-      return `<td class="edit ${cls}" data-apto="${c.apto}" data-mes="${m}" data-v="${v}" title="Editar">${v?fmtN(v):(vencido?'pendente':'—')}</td>`;
-    }).join('')}<td><b>${fmtN(tot)}</b></td></tr>`;}).join('')}</tbody>
+  const C = calc();
+  const aptos = D.moradores.map(m=>m.apto);
+  const totalMes = MESES.map((_,i)=>aptos.reduce((s,a)=>s+(C.cotas[a]||[])[i]||0,0));
+  $('#tbl-cotas').innerHTML = `<thead><tr><th>Apto</th>${thMeses()}<th>Total</th></tr></thead>
+  <tbody>${D.moradores.map(m=>{
+    const v = C.cotas[m.apto]||Array(12).fill(0);
+    return `<tr><td><b>${esc(m.apto)}</b> <span class="status">${esc(m.nome)}</span></td>${MESES.map((mes,i)=>{
+      const x=v[i]||0;
+      const vencido = ANO<hoje.getFullYear() || (ANO===hoje.getFullYear() && i<=hoje.getMonth());
+      const cls = x>0 ? (x < m.valorCota-0.01 ? 'pend' : 'pago') : (vencido ? 'pend' : 'zero');
+      return `<td class="edit ${cls}" data-apto="${esc(m.apto)}" data-mes="${mes}" data-v="${x}">${x?fmtN(x):(vencido?'pendente':'—')}</td>`;}).join('')}<td><b>${fmtN(v.reduce((s,x)=>s+x,0))}</b></td></tr>`;}).join('')}</tbody>
   <tfoot><tr><td>Total</td>${totalMes.map(v=>`<td>${v?fmtN(v):'—'}</td>`).join('')}<td>${fmtN(totalMes.reduce((s,v)=>s+v,0))}</td></tr></tfoot>`;
   $('#tbl-cotas').onclick = async e => {
+    if(!CAN_WRITE) return;
     const td = e.target.closest('td.edit'); if(!td) return;
+    const m = D.moradores.find(x=>x.apto===td.dataset.apto);
     const atual = Number(td.dataset.v)||0;
-    const s = prompt(`Cota do apto ${td.dataset.apto} em ${td.dataset.mes} (R$):`, atual ? fmtN(atual) : fmtN(cotaPadrao(td.dataset.apto)));
-    if (s===null) return;
-    const valor = parseBR(s);
-    try { await apiPost({action:'salvarCota', apto:td.dataset.apto, mes:td.dataset.mes, valor}); toast('Cota salva'); await carregar(); }
-    catch(err){ toast(err.message, true); }
+    const s = prompt(`Cota do apto ${m.apto} referente a ${td.dataset.mes}/${ANO} — valor total (R$):`, fmtN(atual||m.valorCota)); if(s===null) return;
+    const novo = parseBR(s), delta = r2(novo - atual); if(!delta) return;
+    const dia = prompt('Data do pagamento (dd/mm/aaaa):', hojeBR()); if(dia===null) return;
+    const data = parseData(dia); if(!data){ toast('Data inválida',true); return; }
+    try { await salvar(d=>d.lancamentos.push(lanc(data, `Cota apto ${m.apto} (${delta>0?'registro':'correção'} manual)`, Math.abs(delta), delta>0?'receita':'estorno-receita', m.apto, td.dataset.mes)), `Cota ${m.apto} ${td.dataset.mes}/${ANO}`); toast('Cota salva'); } catch(err){ toast(err.message,true); }
   };
 }
 
 function renderDespesas(){
-  const {desp} = totais();
-  $('#tbl-despesas').innerHTML = `<thead><tr><th>Categoria</th>${MESES.map((m,i)=>`<th class="${i===mesAtualIdx?'mes-atual':''}">${m}</th>`).join('')}<th>Total</th></tr></thead>
-  <tbody>${D.despesas.map(d=>`<tr><td>${esc(d.label)}</td>${MESES.map((m,i)=>{const v=d.meses[i]||0;
-    return `<td class="edit ${v?'':'zero'}" data-cat="${esc(d.label)}" data-mes="${m}" data-v="${v}">${v?fmtN(v):'—'}</td>`;}).join('')}<td><b>${fmtN(d.meses.reduce((s,v)=>s+v,0))}</b></td></tr>`).join('')}</tbody>
-  <tfoot><tr><td>Total</td>${desp.map(v=>`<td>${v?fmtN(v):'—'}</td>`).join('')}<td>${fmtN(desp.reduce((s,v)=>s+v,0))}</td></tr></tfoot>`;
+  const C = calc();
+  $('#tbl-despesas').innerHTML = `<thead><tr><th>Categoria</th>${thMeses()}<th>Total</th></tr></thead>
+  <tbody>${D.categorias.map(c=>{ const v=C.despCat[c]||Array(12).fill(0);
+    return `<tr><td>${esc(c)}</td>${MESES.map((mes,i)=>`<td class="edit ${v[i]?'':'zero'}" data-cat="${esc(c)}" data-mes="${mes}" data-v="${v[i]||0}">${v[i]?fmtN(v[i]):'—'}</td>`).join('')}<td><b>${fmtN(v.reduce((s,x)=>s+x,0))}</b></td></tr>`;}).join('')}</tbody>
+  <tfoot><tr><td>Total</td>${C.desp.map(v=>`<td>${v?fmtN(v):'—'}</td>`).join('')}<td>${fmtN(C.desp.reduce((s,v)=>s+v,0))}</td></tr></tfoot>`;
   $('#tbl-despesas').onclick = async e => {
+    if(!CAN_WRITE) return;
     const td = e.target.closest('td.edit'); if(!td) return;
-    const s = prompt(`${td.dataset.cat} em ${td.dataset.mes} — valor total do mês (R$):`, fmtN(Number(td.dataset.v)||0));
-    if (s===null) return;
-    try { await apiPost({action:'salvarDespesa', categoria:td.dataset.cat, mes:td.dataset.mes, valor:parseBR(s)}); toast('Despesa salva'); await carregar(); }
-    catch(err){ toast(err.message, true); }
+    const s = prompt(`${td.dataset.cat} — valor a lançar em ${td.dataset.mes}/${ANO} (R$, negativo para estornar):`, ''); if(s===null||!s.trim()) return;
+    const v = parseBR(s); if(!v) return;
+    const desc = prompt('Descrição:', td.dataset.cat.replace(/^\d+\.\d+ - /,'')); if(desc===null) return;
+    const dia = prompt('Data (dd/mm/aaaa):', `01/${String(mesIdx(td.dataset.mes)+1).padStart(2,'0')}/${ANO}`); if(dia===null) return;
+    const data = parseData(dia); if(!data){ toast('Data inválida',true); return; }
+    try { await salvar(d=>d.lancamentos.push(lanc(data, desc, Math.abs(v), v>0?'despesa':'estorno-despesa', td.dataset.cat, td.dataset.mes)), `Despesa ${td.dataset.cat} ${td.dataset.mes}/${ANO}`); toast('Despesa salva'); } catch(err){ toast(err.message,true); }
   };
 }
 
-function renderUltimos(){
-  const l = [...(D.lancamentos||[])].slice(-15).reverse();
-  if(!l.length){ $('#tbl-ultimos').innerHTML = `<tr><td class="empty" style="text-align:center">Nenhum extrato importado ainda. Use a aba “Importar extrato”.</td></tr>`; return; }
-  $('#tbl-ultimos').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left">Descrição</th><th style="text-align:left">Destino</th><th>Valor</th></tr></thead>
-  <tbody>${l.map(x=>`<tr><td>${fmtData(x.data)}</td><td class="desc">${esc(x.descricao)}</td><td style="text-align:left">${x.tipo==='receita'?`Apto ${esc(x.destino)} · ${esc(x.mesRef)}`:esc(x.destino)}</td><td class="${x.tipo}">${x.tipo==='receita'?'+':'−'} ${fmtN(x.valor)}</td></tr>`).join('')}</tbody>`;
+function renderLanc(){
+  const L = doAno().slice().sort((a,b)=>b.data.localeCompare(a.data));
+  $('#lanc-status').textContent = `${L.length} lançamentos`;
+  if(!L.length){ $('#tbl-lanc').innerHTML = `<tr><td class="empty" style="text-align:center">Nenhum lançamento em ${ANO}.</td></tr>`; return; }
+  $('#tbl-lanc').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left">Descrição</th><th style="text-align:left">Destino</th><th>Valor</th><th class="edit-only"></th></tr></thead>
+  <tbody>${L.map(x=>`<tr data-id="${esc(x.id)}"><td>${fmtData(x.data)}</td><td class="desc">${esc(x.descricao)}</td><td style="text-align:left">${/receita/.test(x.tipo)?`Apto ${esc(x.destino)} · ${esc(x.mesRef)}`:esc(x.destino)}</td><td class="${/receita/.test(x.tipo)?'rec':'desp'}">${/receita/.test(x.tipo)?'+':'−'} ${fmtN(x.valor)}</td><td class="acao edit-only"><button class="x" title="Excluir">×</button></td></tr>`).join('')}</tbody>`;
+  $('#tbl-lanc').onclick = async e => {
+    const b = e.target.closest('button.x'); if(!b||!CAN_WRITE) return;
+    const id = b.closest('tr').dataset.id; const l = D.lancamentos.find(x=>x.id===id);
+    if(!confirm(`Excluir "${l.descricao}" de ${fmtN(l.valor)}?`)) return;
+    try { await salvar(d=>{ d.lancamentos = d.lancamentos.filter(x=>x.id!==id); }, `Exclui lançamento ${id}`); toast('Lançamento excluído'); } catch(err){ toast(err.message,true); }
+  };
 }
-
-function fmtData(s){ const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : s; }
-function parseBR(s){ s=String(s).replace(/R\$|\s/g,''); if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:Math.round(n*100)/100; }
 
 // ---------- Cadastros ----------
 function renderCadastros(){
-  const M = D.moradores.length ? D.moradores : D.cotas.map(c=>({apto:c.apto,nome:'',apelidos:'',valorCota:0}));
-  $('#tbl-moradores').innerHTML = `<thead><tr><th>Apto</th><th style="text-align:left">Nome</th><th style="text-align:left">Apelidos no extrato</th><th>Cota (R$)</th><th></th></tr></thead>
-  <tbody>${M.map(m=>rowMorador(m)).join('')}</tbody>`;
-  $('#tbl-regras').innerHTML = `<thead><tr><th style="text-align:left">Palavra-chave</th><th style="text-align:left">Categoria</th><th></th></tr></thead>
-  <tbody>${D.regras.map(r=>rowRegra(r)).join('')}</tbody>`;
+  $('#tbl-moradores').innerHTML = `<thead><tr><th>Apto</th><th style="text-align:left">Nome</th><th style="text-align:left">Apelidos no extrato</th><th>Cota (R$)</th><th></th></tr></thead><tbody>${D.moradores.map(rowMorador).join('')}</tbody>`;
+  $('#tbl-regras').innerHTML = `<thead><tr><th style="text-align:left">Palavra-chave</th><th style="text-align:left">Categoria</th><th></th></tr></thead><tbody>${D.regras.map(rowRegra).join('')}</tbody>`;
+  $('#tbl-cats').innerHTML = `<thead><tr><th style="text-align:left">Categoria</th><th></th></tr></thead><tbody>${D.categorias.map(rowCat).join('')}</tbody>`;
 }
 function rowMorador(m={}){ return `<tr><td><input type="text" class="apto" value="${esc(m.apto||'')}" data-k="apto"></td><td><input type="text" value="${esc(m.nome||'')}" data-k="nome"></td><td><input type="text" value="${esc(m.apelidos||'')}" data-k="apelidos"></td><td><input type="number" step="0.01" value="${m.valorCota||''}" data-k="valorCota"></td><td class="acao"><button class="x" title="Remover">×</button></td></tr>`; }
-function rowRegra(r={}){
-  const cats = (D.categoriasDespesa||[]);
-  return `<tr><td><input type="text" value="${esc(r.chave||'')}" data-k="chave"></td><td><select data-k="categoria" class="inline">${cats.map(c=>`<option ${c===r.categoria?'selected':''}>${esc(c)}</option>`).join('')}</select></td><td class="acao"><button class="x" title="Remover">×</button></td></tr>`;
-}
+function rowRegra(r={}){ return `<tr><td><input type="text" value="${esc(r.chave||'')}" data-k="chave"></td><td><select data-k="categoria" class="inline">${D.categorias.map(c=>`<option ${c===r.categoria?'selected':''}>${esc(c)}</option>`).join('')}</select></td><td class="acao"><button class="x" title="Remover">×</button></td></tr>`; }
+function rowCat(c=''){ return `<tr><td><input type="text" value="${esc(c)}" data-k="nome" placeholder="2.14 - Nova categoria"></td><td class="acao"><button class="x" title="Remover">×</button></td></tr>`; }
 function readRows(tbl){ return [...$(tbl).querySelectorAll('tbody tr')].map(tr=>{ const o={}; tr.querySelectorAll('[data-k]').forEach(el=>o[el.dataset.k]=el.type==='number'?Number(el.value)||0:el.value.trim()); return o; }); }
-document.addEventListener('click', e => { const x=e.target.closest('button.x'); if(x) x.closest('tr').remove(); });
-$('#btn-add-morador').onclick = ()=> $('#tbl-moradores tbody').insertAdjacentHTML('beforeend', rowMorador());
-$('#btn-add-regra').onclick = ()=> $('#tbl-regras tbody').insertAdjacentHTML('beforeend', rowRegra());
-$('#btn-save-moradores').onclick = async ()=>{ try{ await apiPost({action:'salvarMoradores', moradores:readRows('#tbl-moradores').filter(m=>m.apto)}); toast('Moradores salvos'); await carregar(); }catch(e){toast(e.message,true);} };
-$('#btn-save-regras').onclick = async ()=>{ try{ await apiPost({action:'salvarRegras', regras:readRows('#tbl-regras').filter(r=>r.chave)}); toast('Regras salvas'); await carregar(); }catch(e){toast(e.message,true);} };
+function addRow(tblSel, html){ const tb=$(tblSel).querySelector('tbody'); tb.insertAdjacentHTML('beforeend', html); const inp=tb.lastElementChild.querySelector('input'); if(inp){ inp.scrollIntoView({block:'nearest'}); inp.focus(); } }
+document.addEventListener('click', e => { const x=e.target.closest('#tab-cadastros button.x'); if(x) x.closest('tr').remove(); });
+$('#btn-add-morador').onclick = ()=> addRow('#tbl-moradores', rowMorador());
+$('#btn-add-regra').onclick = ()=> addRow('#tbl-regras', rowRegra());
+$('#btn-add-cat').onclick = ()=> addRow('#tbl-cats', rowCat());
+$('#btn-save-moradores').onclick = async ()=>{ const rows=readRows('#tbl-moradores').filter(m=>m.apto); try{ await salvar(d=>{ d.moradores=rows; }, 'Atualiza moradores'); toast('Moradores salvos'); }catch(e){toast(e.message,true);} };
+$('#btn-save-regras').onclick = async ()=>{ const rows=readRows('#tbl-regras').filter(r=>r.chave); try{ await salvar(d=>{ d.regras=rows; }, 'Atualiza regras'); toast('Regras salvas'); }catch(e){toast(e.message,true);} };
+$('#btn-save-cats').onclick = async ()=>{ const rows=readRows('#tbl-cats').map(r=>r.nome).filter(Boolean); try{ await salvar(d=>{ d.categorias=rows; }, 'Atualiza categorias'); toast('Categorias salvas'); }catch(e){toast(e.message,true);} };
 
-// ---------- Importação de extrato ----------
+// ---------- Utilidades ----------
+function fmtData(s){ const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[3]}/${m[2]}/${m[1]}`:s; }
+function hojeBR(){ return hoje.toLocaleDateString('pt-BR'); }
+function parseBR(s){ s=String(s).replace(/R\$|\s/g,''); if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:r2(n); }
+function parseData(s){ if(!s) return null; s=String(s).trim(); let m=s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/); if(m) return `${m[3]}-${m[2]}-${m[1]}`; m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`; m=s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{2})$/); if(m) return `20${m[3]}-${m[2]}-${m[1]}`; return null; }
+function hash(s){ let h=0; for(const ch of s) h=(h*31+ch.charCodeAt(0))|0; return 'H'+(h>>>0).toString(36); }
+function lanc(data, descricao, valor, tipo, destino, mesRef){
+  // estornos são gravados como valores negativos do tipo base
+  const neg = tipo.startsWith('estorno-'); const t = neg ? tipo.slice(8) : tipo;
+  return { id: hash(data+descricao+valor+tipo+Date.now()), data, descricao, valor: neg ? -valor : valor, tipo: t, destino, mesRef: mesRef||MESES[+data.slice(5,7)-1], origem:'manual' };
+}
+
+// ---------- Importação ----------
 const drop = $('#drop');
 ['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
 ['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
 drop.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) lerArquivo(f); });
 $('#file').addEventListener('change', e=>{ if(e.target.files[0]) lerArquivo(e.target.files[0]); e.target.value=''; });
-
-function fillMesRef(){
-  const sel = $('#imp-mesref');
-  sel.innerHTML = `<option value="">Mês do pagamento</option>` + MESES.map(m=>`<option value="${m}">${m}</option>`).join('');
-  sel.onchange = ()=>{ IMP.forEach(l=>{ if(l.tipo==='receita' && !l.mesRefManual) l.mesRef = sel.value || l.mesPag; }); renderImport(); };
-}
+function fillMesRef(){ const sel=$('#imp-mesref'); const cur=sel.value; sel.innerHTML=`<option value="">Mês do pagamento</option>`+MESES.map(m=>`<option value="${m}">${m}</option>`).join(''); sel.value=cur; sel.onchange=()=>{ IMP.forEach(l=>{ if(l.tipo==='receita'&&!l.mesRefManual) l.mesRef=sel.value||l.mesPag; }); renderImport(); }; }
 
 async function lerArquivo(file){
-  if(!D){ toast('Aguarde a planilha carregar', true); return; }
   const buf = await file.arrayBuffer();
   let txt = new TextDecoder('utf-8').decode(buf);
   if (/\uFFFD/.test(txt) || /CHARSET:1252|ENCODING:USASCII/i.test(txt)) txt = new TextDecoder('windows-1252').decode(buf);
-  let trans;
-  if (/<OFX>|<STMTTRN>/i.test(txt)) trans = parseOFX(txt);
-  else trans = parseCSV(txt);
+  const trans = /<OFX>|<STMTTRN>/i.test(txt) ? parseOFX(txt) : parseCSV(txt);
   if(!trans.length){ toast('Não encontrei transações no arquivo', true); return; }
   IMP = trans.map(classificar);
-  $('#imp-toolbar').hidden = false; $('#imp-card').hidden = false; $('#imp-result').hidden = true;
+  $('#imp-toolbar').hidden=false; $('#imp-card').hidden=false;
   renderImport();
 }
-
 function parseOFX(txt){
-  const out = [];
-  const blocks = txt.match(/<STMTTRN>[\s\S]*?(?=<\/STMTTRN>|<STMTTRN>|<\/BANKTRANLIST>)/gi) || [];
-  const tag = (b,t)=>{ const m=b.match(new RegExp(`<${t}>([^<\\r\\n]*)`,'i')); return m?m[1].trim():''; };
+  const out=[]; const blocks = txt.match(/<STMTTRN>[\s\S]*?(?=<\/STMTTRN>|<STMTTRN>|<\/BANKTRANLIST>)/gi)||[];
+  const tag=(b,t)=>{ const m=b.match(new RegExp(`<${t}>([^<\\r\\n]*)`,'i')); return m?m[1].trim():''; };
   for(const b of blocks){
-    const dt = tag(b,'DTPOSTED'); const amt = parseFloat(tag(b,'TRNAMT').replace(',','.'));
-    if(!dt || isNaN(amt)) continue;
-    const data = `${dt.slice(0,4)}-${dt.slice(4,6)}-${dt.slice(6,8)}`;
-    const desc = [tag(b,'NAME'), tag(b,'MEMO')].filter(Boolean).join(' — ');
-    const id = tag(b,'FITID') || hash(data+desc+amt);
-    out.push({id, data, descricao:desc, valor:Math.abs(amt), credito: amt>0});
+    const dt=tag(b,'DTPOSTED'); const amt=parseFloat(tag(b,'TRNAMT').replace(',','.')); if(!dt||isNaN(amt)) continue;
+    const data=`${dt.slice(0,4)}-${dt.slice(4,6)}-${dt.slice(6,8)}`; const desc=[tag(b,'NAME'),tag(b,'MEMO')].filter(Boolean).join(' — ');
+    out.push({id: tag(b,'FITID')||hash(data+desc+amt), data, descricao:desc, valor:Math.abs(amt), credito:amt>0});
   }
   return out;
 }
-
 function parseCSV(txt){
-  const lines = txt.split(/\r?\n/).filter(l=>l.trim());
-  if(lines.length<2) return [];
-  const sep = [';','\t',','].map(s=>[s,(lines[0].split(s).length)]).sort((a,b)=>b[1]-a[1])[0][0];
-  const split = l => { const o=[]; let cur='',q=false; for(const ch of l){ if(ch==='"'){q=!q;continue;} if(ch===sep&&!q){o.push(cur);cur='';} else cur+=ch; } o.push(cur); return o.map(s=>s.trim()); };
-  const rows = lines.map(split);
-  // localizar cabeçalho
-  let hi = rows.findIndex(r => r.some(c=>/data/i.test(c)) && r.some(c=>/valor|amount|cr[eé]dito|d[eé]bito/i.test(c)));
+  const lines=txt.split(/\r?\n/).filter(l=>l.trim()); if(lines.length<2) return [];
+  const sep=[';','\t',','].map(s=>[s,lines[0].split(s).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const split=l=>{ const o=[]; let cur='',q=false; for(const ch of l){ if(ch==='"'){q=!q;continue;} if(ch===sep&&!q){o.push(cur);cur='';} else cur+=ch; } o.push(cur); return o.map(s=>s.trim()); };
+  const rows=lines.map(split);
+  let hi=rows.findIndex(r=>r.some(c=>/data/i.test(c))&&r.some(c=>/valor|amount|cr[eé]dito|d[eé]bito/i.test(c)));
   let iData=0,iDesc=1,iVal=-1,iCred=-1,iDeb=-1;
-  if(hi>=0){
-    const h = rows[hi].map(c=>norm(c));
-    iData = h.findIndex(c=>/^DATA|DATE/.test(c));
-    iDesc = h.findIndex(c=>/DESCRI|HIST|MEMO|LANCAMENTO|TITULO/.test(c)); if(iDesc<0) iDesc = h.findIndex((c,i)=>i!==iData && !/VALOR|SALDO|AMOUNT/.test(c));
-    iVal = h.findIndex(c=>/^VALOR|AMOUNT|MONTANTE/.test(c));
-    iCred = h.findIndex(c=>/CREDITO|ENTRADA/.test(c)); iDeb = h.findIndex(c=>/DEBITO|SAIDA/.test(c));
-  } else { hi=-1; iVal = rows[0].length-1; }
+  if(hi>=0){ const h=rows[hi].map(norm);
+    iData=h.findIndex(c=>/^DATA|DATE/.test(c)); iDesc=h.findIndex(c=>/DESCRI|HIST|MEMO|LANCAMENTO|TITULO/.test(c)); if(iDesc<0) iDesc=h.findIndex((c,i)=>i!==iData&&!/VALOR|SALDO|AMOUNT/.test(c));
+    iVal=h.findIndex(c=>/^VALOR|AMOUNT|MONTANTE/.test(c)); iCred=h.findIndex(c=>/CREDITO|ENTRADA/.test(c)); iDeb=h.findIndex(c=>/DEBITO|SAIDA/.test(c));
+  } else { hi=-1; iVal=rows[0].length-1; }
   const out=[];
-  for(let i=hi+1;i<rows.length;i++){
-    const r=rows[i]; const data = parseData(r[iData]); if(!data) continue;
-    let valor=0, credito=true;
-    if(iVal>=0 && r[iVal]){ const v=parseBR(r[iVal]); if(!v) continue; valor=Math.abs(v); credito = v>0 && !/^-/.test(r[iVal].trim()); }
-    else if(iCred>=0||iDeb>=0){ const c=iCred>=0?parseBR(r[iCred]):0, d=iDeb>=0?parseBR(r[iDeb]):0; if(c){valor=Math.abs(c);credito=true;} else if(d){valor=Math.abs(d);credito=false;} else continue; }
+  for(let i=hi+1;i<rows.length;i++){ const r=rows[i]; const data=parseData(r[iData]); if(!data) continue;
+    let valor=0,credito=true;
+    if(iVal>=0&&r[iVal]){ const v=parseBR(r[iVal]); if(!v) continue; valor=Math.abs(v); credito=v>0&&!/^-/.test(r[iVal].trim()); }
+    else if(iCred>=0||iDeb>=0){ const c=iCred>=0?parseBR(r[iCred]):0,d=iDeb>=0?parseBR(r[iDeb]):0; if(c){valor=Math.abs(c);credito=true;} else if(d){valor=Math.abs(d);credito=false;} else continue; }
     else continue;
-    const descricao = r[iDesc]||'';
-    if(/SALDO/i.test(descricao) && !/PIX|TED|TRANSF/i.test(descricao)) continue;
+    const descricao=r[iDesc]||''; if(/SALDO/i.test(descricao)&&!/PIX|TED|TRANSF/i.test(descricao)) continue;
     out.push({id:hash(data+descricao+valor+(credito?'C':'D')), data, descricao, valor, credito});
   }
   return out;
 }
-function parseData(s){ if(!s) return null; s=String(s).trim(); let m=s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/); if(m) return `${m[3]}-${m[2]}-${m[1]}`; m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`; m=s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{2})$/); if(m) return `20${m[3]}-${m[2]}-${m[1]}`; return null; }
-function hash(s){ let h=0; for(const ch of s) h=(h*31+ch.charCodeAt(0))|0; return 'H'+(h>>>0).toString(36); }
-
 function classificar(t){
-  const d = norm(t.descricao);
-  const l = {...t, tipo: t.credito?'receita':'despesa', destino:'', motivo:'', mesPag: MESES[new Date(t.data+'T12:00:00').getMonth()], incluir:true};
-  l.mesRef = $('#imp-mesref').value || l.mesPag;
-  l.jaLancado = (D.lancamentos||[]).some(x=>x.id===l.id);
-  if(l.jaLancado) l.incluir=false;
+  const d=norm(t.descricao); const mp=MESES[+t.data.slice(5,7)-1];
+  const l={...t, tipo:t.credito?'receita':'despesa', destino:'', motivo:'', mesPag:mp, incluir:true};
+  l.mesRef=$('#imp-mesref').value||mp;
+  l.jaLancado=D.lancamentos.some(x=>x.id===l.id); if(l.jaLancado) l.incluir=false;
   if(t.credito){
-    // 1) número do apto na descrição
-    const ap = d.match(/\b(?:AP|APT|APTO|APARTAMENTO|UNIDADE)\s*0?(\d{3,4})\b/);
-    if(ap && D.cotas.some(c=>c.apto===ap[1])){ l.destino=ap[1]; l.motivo='nº do apto na descrição'; }
-    // 2) nome / apelidos
-    if(!l.destino){
-      for(const m of D.moradores){
-        const tokens=[m.nome, ...String(m.apelidos||'').split(',')].map(norm).filter(x=>x.length>=3);
-        if(tokens.some(tok=>d.includes(tok))){ l.destino=m.apto; l.motivo=`pagador: ${m.nome||m.apto}`; break; }
-      }
-    }
-    // 3) valor igual à cota de um único apto ainda sem pagamento no mês
-    if(!l.destino){
-      const mi = MESES.indexOf(l.mesRef);
-      const cand = D.moradores.filter(m=>Math.abs(m.valorCota-t.valor)<0.01 && !(D.cotas.find(c=>c.apto===m.apto)||{meses:[]}).meses[mi]);
-      if(cand.length===1){ l.destino=cand[0].apto; l.motivo='valor da cota (confirmar)'; }
-    }
+    const ap=d.match(/\b(?:AP|APT|APTO|APARTAMENTO|UNIDADE)\s*0?(\d{3,4})\b/);
+    if(ap&&D.moradores.some(m=>m.apto===ap[1])){ l.destino=ap[1]; l.motivo='nº do apto na descrição'; }
+    if(!l.destino) for(const m of D.moradores){ const toks=[m.nome,...String(m.apelidos||'').split(',')].map(norm).filter(x=>x.length>=3); if(toks.some(tk=>d.includes(tk))){ l.destino=m.apto; l.motivo=`pagador: ${m.nome}`; break; } }
+    if(!l.destino){ const C=calc(); const mi=mesIdx(l.mesRef); const cand=D.moradores.filter(m=>Math.abs(m.valorCota-t.valor)<0.01&&!(C.cotas[m.apto]||[])[mi]); if(cand.length===1){ l.destino=cand[0].apto; l.motivo='valor da cota (confirmar)'; } }
     if(!l.destino) l.motivo='pagador não reconhecido';
   } else {
-    const regra = D.regras.find(r=>r.chave && d.includes(norm(r.chave)));
-    if(regra){ l.destino=regra.categoria; l.motivo=`regra “${regra.chave}”`; }
-    else if(/PIX|TED|TRANSF/i.test(d) && D.moradores.some(m=>m.nome && d.includes(norm(m.nome)))) { l.tipo='despesa'; l.motivo='transferência para morador (reembolso?)'; }
-    else l.motivo='sem regra — escolha a categoria';
+    const regra=D.regras.find(r=>r.chave&&d.includes(norm(r.chave)));
+    if(regra){ l.destino=regra.categoria; l.motivo=`regra “${regra.chave}”`; } else l.motivo='sem regra — escolha a categoria';
   }
   return l;
 }
-
 function renderImport(){
-  const cats = D.categoriasDespesa;
-  const optApto = v => `<option value="">Escolher apto…</option>`+D.cotas.map(c=>{const n=(D.moradores.find(m=>m.apto===c.apto)||{}).nome; return `<option value="${c.apto}" ${c.apto===v?'selected':''}>${c.apto}${n?' · '+esc(n.split(' ')[0]):''}</option>`;}).join('');
-  const optCat = v => `<option value="">Escolher categoria…</option>`+cats.map(c=>`<option ${c===v?'selected':''}>${esc(c)}</option>`).join('');
-  $('#tbl-import').innerHTML = `<thead><tr><th style="text-align:center"><input type="checkbox" id="chk-all" ${IMP.every(l=>l.incluir||l.jaLancado)?'checked':''}></th><th>Data</th><th style="text-align:left">Descrição</th><th>Valor</th><th style="text-align:left">Tipo</th><th style="text-align:left">Destino</th><th style="text-align:left">Mês ref.</th><th style="text-align:left">Classificação</th></tr></thead>
+  if(!IMP.length) return;
+  const optApto=v=>`<option value="">Escolher apto…</option>`+D.moradores.map(m=>`<option value="${esc(m.apto)}" ${m.apto===v?'selected':''}>${esc(m.apto)} · ${esc(m.nome)}</option>`).join('');
+  const optCat=v=>`<option value="">Escolher categoria…</option>`+D.categorias.map(c=>`<option ${c===v?'selected':''}>${esc(c)}</option>`).join('');
+  $('#tbl-import').innerHTML=`<thead><tr><th style="text-align:center"><input type="checkbox" id="chk-all" ${IMP.every(l=>l.incluir||l.jaLancado)?'checked':''}></th><th>Data</th><th style="text-align:left">Descrição</th><th>Valor</th><th style="text-align:left">Tipo</th><th style="text-align:left">Destino</th><th style="text-align:left">Mês ref.</th><th style="text-align:left">Classificação</th></tr></thead>
   <tbody>${IMP.map((l,i)=>`<tr class="${l.incluir?'':'off'}" data-i="${i}">
     <td style="text-align:center"><input type="checkbox" data-k="incluir" ${l.incluir?'checked':''} ${l.jaLancado?'disabled':''}></td>
-    <td>${fmtData(l.data)}</td>
-    <td class="desc">${esc(l.descricao)}</td>
-    <td class="${l.tipo}">${l.credito?'+':'−'} ${fmtN(l.valor)}</td>
+    <td>${fmtData(l.data)}</td><td class="desc">${esc(l.descricao)}</td>
+    <td class="${l.tipo==='receita'?'rec':'desp'}">${l.credito?'+':'−'} ${fmtN(l.valor)}</td>
     <td style="text-align:left"><select class="inline" data-k="tipo"><option value="receita" ${l.tipo==='receita'?'selected':''}>Cota</option><option value="despesa" ${l.tipo==='despesa'?'selected':''}>Despesa</option></select></td>
     <td style="text-align:left"><select class="inline" data-k="destino">${l.tipo==='receita'?optApto(l.destino):optCat(l.destino)}</select></td>
     <td style="text-align:left">${l.tipo==='receita'?`<select class="inline" data-k="mesRef">${MESES.map(m=>`<option ${m===l.mesRef?'selected':''}>${m}</option>`).join('')}</select>`:`<span class="status">${l.mesPag}</span>`}</td>
-    <td style="text-align:left">${l.jaLancado?'<span class="pill dup">já lançado</span>':(l.destino?`<span class="pill ${l.tipo}">${esc(l.motivo)}</span>`:`<span class="pill warn">${esc(l.motivo)}</span>`)}</td>
+    <td style="text-align:left">${l.jaLancado?'<span class="pill dup">já lançado</span>':(l.destino?`<span class="pill ${l.tipo==='receita'?'rec':'desp'}">${esc(l.motivo)}</span>`:`<span class="pill warn">${esc(l.motivo)}</span>`)}</td>
   </tr>`).join('')}</tbody>`;
   atualizarImpStatus();
-  $('#chk-all').onchange = e => { IMP.forEach(l=>{ if(!l.jaLancado) l.incluir=e.target.checked; }); renderImport(); };
-  $('#tbl-import').onchange = e => {
-    const tr=e.target.closest('tr[data-i]'); if(!tr) return; const l=IMP[tr.dataset.i]; const k=e.target.dataset.k;
-    if(k==='incluir') l.incluir=e.target.checked;
-    else if(k==='tipo'){ l.tipo=e.target.value; l.destino=''; l.motivo='definido manualmente'; }
-    else if(k==='destino'){ l.destino=e.target.value; l.motivo='definido manualmente'; }
-    else if(k==='mesRef'){ l.mesRef=e.target.value; l.mesRefManual=true; }
-    renderImport();
-  };
+  $('#chk-all').onchange=e=>{ IMP.forEach(l=>{ if(!l.jaLancado) l.incluir=e.target.checked; }); renderImport(); };
+  $('#tbl-import').onchange=e=>{ const tr=e.target.closest('tr[data-i]'); if(!tr) return; const l=IMP[tr.dataset.i]; const k=e.target.dataset.k;
+    if(k==='incluir') l.incluir=e.target.checked; else if(k==='tipo'){ l.tipo=e.target.value; l.destino=''; l.motivo='definido manualmente'; } else if(k==='destino'){ l.destino=e.target.value; l.motivo='definido manualmente'; } else if(k==='mesRef'){ l.mesRef=e.target.value; l.mesRefManual=true; }
+    renderImport(); };
 }
 function atualizarImpStatus(){
-  const sel = IMP.filter(l=>l.incluir);
-  const semDestino = sel.filter(l=>!l.destino).length;
-  const rec = sel.filter(l=>l.tipo==='receita').reduce((s,l)=>s+l.valor,0);
-  const desp = sel.filter(l=>l.tipo==='despesa').reduce((s,l)=>s+l.valor,0);
-  $('#imp-status').textContent = `${sel.length} de ${IMP.length} selecionados · cotas ${fmt(rec)} · despesas ${fmt(desp)}` + (semDestino?` · ${semDestino} sem destino (não serão lançados)`:'');
-  $('#btn-lancar').disabled = !sel.some(l=>l.destino);
+  const sel=IMP.filter(l=>l.incluir); const semDestino=sel.filter(l=>!l.destino).length;
+  const rec=sel.filter(l=>l.tipo==='receita').reduce((s,l)=>s+l.valor,0), desp=sel.filter(l=>l.tipo==='despesa').reduce((s,l)=>s+l.valor,0);
+  $('#imp-status').textContent=`${sel.length} de ${IMP.length} selecionados · cotas ${fmt(rec)} · despesas ${fmt(desp)}`+(semDestino?` · ${semDestino} sem destino (não serão lançados)`:'');
+  $('#btn-lancar').disabled=!sel.some(l=>l.destino);
 }
-$('#btn-lancar').onclick = async ()=>{
-  const lancs = IMP.filter(l=>l.incluir && l.destino).map(l=>({id:l.id,data:l.data,descricao:l.descricao,valor:l.valor,tipo:l.tipo,destino:l.destino,mesRef:l.tipo==='receita'?l.mesRef:l.mesPag}));
-  if(!lancs.length) return;
-  if(!confirm(`Lançar ${lancs.length} transações na planilha? Os valores serão somados aos já existentes.`)) return;
-  $('#btn-lancar').disabled = true; $('#btn-lancar').textContent='Lançando…';
+$('#btn-lancar').onclick=async()=>{
+  const novos=IMP.filter(l=>l.incluir&&l.destino).map(l=>({id:l.id,data:l.data,descricao:l.descricao,valor:l.valor,tipo:l.tipo,destino:l.destino,mesRef:l.tipo==='receita'?l.mesRef:l.mesPag,origem:'extrato'}));
+  if(!novos.length) return;
+  if(!confirm(`Lançar ${novos.length} transações?`)) return;
+  $('#btn-lancar').disabled=true; $('#btn-lancar').textContent='Lançando…';
   try{
-    const r = await apiPost({action:'importar', lancamentos:lancs});
-    $('#imp-result').hidden=false;
-    $('#imp-result-body').innerHTML = `<b>${r.gravados} lançamentos gravados</b>${r.duplicados?`, ${r.duplicados} já existiam`:''}${r.ignorados.length?`, ${r.ignorados.length} ignorados`:''}.`
-      + (r.avisos.length?`<ul>${r.avisos.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:'')
-      + (r.ignorados.length?`<ul>${r.ignorados.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:'');
-    toast(`${r.gravados} lançamentos gravados`);
-    await carregar();
-    IMP = IMP.map(classificar); renderImport();
-  }catch(e){ toast(e.message,true); }
-  finally{ $('#btn-lancar').textContent='Lançar na planilha'; atualizarImpStatus(); }
+    let grav=0;
+    await salvar(d=>{ const ids=new Set(d.lancamentos.map(x=>x.id)); for(const n of novos){ if(!ids.has(n.id)){ d.lancamentos.push(n); ids.add(n.id); grav++; } } d.lancamentos.sort((a,b)=>a.data.localeCompare(b.data)); }, `Importa extrato: ${novos.length} lançamentos`);
+    toast(`${grav} lançamentos gravados`); IMP=IMP.map(classificar); renderImport();
+  }catch(e){ toast(e.message,true); } finally{ $('#btn-lancar').textContent='Lançar'; atualizarImpStatus(); }
 };
 
-carregar();
+entrar();
 </script>
 </body>
 </html>
