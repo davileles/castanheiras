@@ -104,8 +104,8 @@ body.ro .edit-only{display:none!important}
 <div id="login" hidden>
   <div class="card">
     <h1 style="margin-bottom:6px">Edifício Castanheiras</h1>
-    <p>Informe a chave de acesso às contas do condomínio. Ela fica salva só neste navegador.</p>
-    <input type="password" id="login-token" placeholder="Chave de acesso" autocomplete="off">
+    <p>Informe seu e-mail para acessar as contas do condomínio. Ele fica salvo só neste navegador.</p>
+    <input type="email" id="login-email" placeholder="seu@email.com" autocomplete="email" inputmode="email">
     <button class="btn" id="login-btn">Entrar</button>
     <p class="status" id="login-msg" style="margin:12px 0 0"></p>
   </div>
@@ -212,7 +212,9 @@ body.ro .edit-only{display:none!important}
 
 <script>
 // ================== CONFIGURAÇÃO ==================
-const GH = { owner: 'davileles', repo: 'castanheiras-dados', path: 'dados.json', branch: 'main' };
+// O navegador nao fala mais com a API do GitHub: quem guarda o token e grava
+// o arquivo e o proxy CDV (painel-cdv/index.js). Aqui so trafega o e-mail.
+const API = 'https://cdv-proxy-production.up.railway.app';
 const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
 const ROW_NO_MES = '1.2 - Cotas condominiais', ROW_ATRASO = '1.1 - Cotas em atraso';
 // ==================================================
@@ -223,68 +225,74 @@ const fmtN = n => (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximum
 const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const r2 = n => Math.round(n*100)/100;
-let D = null, SHA = null, ANO = new Date().getFullYear(), CAN_WRITE = false, IMP = [];
+let D = null, ANO = new Date().getFullYear(), CAN_WRITE = false, IMP = [];
 const hoje = new Date();
 
 function toast(msg, err){ const t=$('#toast'); t.textContent=msg; t.className='show'+(err?' err':''); clearTimeout(t._t); t._t=setTimeout(()=>t.className='',3500); }
 function setStatus(msg){ $('#status').textContent = msg; }
 
 // ---------- Acesso ----------
-function getToken(){ return localStorage.getItem('cast_token') || ''; }
-(function tokenFromHash(){ const m = location.hash.match(/[#&]k=([^&]+)/); if(m){ localStorage.setItem('cast_token', decodeURIComponent(m[1])); history.replaceState(null,'',location.pathname+location.search); } })();
+// Acesso por e-mail: se o endereco estiver na lista de liberados (mantida no
+// repo privado de dados), entra direto. A pagina e publica e estatica, entao
+// nenhum segredo pode morar aqui — o token do GitHub fica so no proxy.
+function getEmail(){ return (localStorage.getItem('cast_email') || '').trim().toLowerCase(); }
+function setEmail(e){ localStorage.setItem('cast_email', String(e||'').trim().toLowerCase()); }
+(function emailDaUrl(){
+  const m = location.hash.match(/[#&]e=([^&]+)/) || location.search.match(/[?&]email=([^&]+)/);
+  if(m){ setEmail(decodeURIComponent(m[1])); history.replaceState(null,'',location.pathname); }
+})();
 
-const ghHeaders = () => ({ 'Authorization': 'Bearer ' + getToken(), 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' });
-const apiBase = `https://api.github.com/repos/${GH.owner}/${GH.repo}`;
+async function api(rota, opts){
+  const r = await fetch(API + rota, { cache:'no-store', ...(opts||{}) });
+  let j = null; try { j = await r.json(); } catch {}
+  if (r.status === 403) throw new Error((j && j.erro) || 'E-mail sem acesso');
+  if (!r.ok) throw new Error((j && j.erro) || ('Servidor respondeu ' + r.status));
+  return j;
+}
 
-async function ghLoad(){
-  const r = await fetch(`${apiBase}/contents/${GH.path}?ref=${GH.branch}&t=${Date.now()}`, { headers: ghHeaders(), cache:'no-store' });
-  if (r.status === 401) throw new Error('Chave inválida ou expirada');
-  if (r.status === 404) throw new Error('Arquivo de dados não encontrado no repositório');
-  if (!r.ok) throw new Error('GitHub respondeu ' + r.status);
-  const j = await r.json();
-  SHA = j.sha;
-  const txt = new TextDecoder().decode(Uint8Array.from(atob(j.content.replace(/\n/g,'')), c=>c.charCodeAt(0)));
-  return JSON.parse(txt);
+async function carregar(){
+  const j = await api(`/castanheiras/dados?email=${encodeURIComponent(getEmail())}&t=${Date.now()}`);
+  return j.dados;
 }
-async function ghPerms(){
-  try { const r = await fetch(apiBase, { headers: ghHeaders() }); const j = await r.json(); return !!(j.permissions && j.permissions.push); } catch { return false; }
-}
-/** Aplica `mutator(D)` sobre a versão mais recente e grava. Refaz em caso de conflito. */
+
+/** Aplica `mutator(D)` sobre a versao mais recente e grava via proxy. */
 async function salvar(mutator, mensagem){
   if(!CAN_WRITE) throw new Error('Acesso somente leitura');
-  for (let tentativa = 0; tentativa < 3; tentativa++) {
-    const fresh = await ghLoad();
-    mutator(fresh);
-    fresh.atualizadoEm = new Date().toISOString();
-    const content = btoa(String.fromCharCode(...new TextEncoder().encode(JSON.stringify(fresh, null, 1))));
-    const r = await fetch(`${apiBase}/contents/${GH.path}`, { method:'PUT', headers: ghHeaders(), body: JSON.stringify({ message: mensagem, content, sha: SHA, branch: GH.branch }) });
-    if (r.status === 409) continue;
-    if (!r.ok) { const e = await r.json().catch(()=>({})); throw new Error(e.message || ('Falha ao gravar: ' + r.status)); }
-    const j = await r.json(); SHA = j.content.sha; D = fresh; renderTudo();
-    return;
-  }
-  throw new Error('Conflito ao gravar — tente novamente');
+  const fresh = await carregar();
+  mutator(fresh);
+  const j = await api('/castanheiras/dados', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: getEmail(), dados: fresh, mensagem })
+  });
+  D = j.dados; renderTudo();
 }
 
 async function entrar(){
-  if(!getToken()){ $('#login').hidden=false; $('#app').hidden=true; return; }
+  if(!getEmail()){ $('#login').hidden=false; $('#app').hidden=true; return; }
   $('#login-msg').textContent='Verificando…';
   try {
-    D = await ghLoad();
-    CAN_WRITE = await ghPerms();
-    document.body.classList.toggle('ro', !CAN_WRITE);
+    const chk = await api(`/castanheiras/login?email=${encodeURIComponent(getEmail())}&t=${Date.now()}`);
+    if(!chk.acesso) throw new Error('E-mail sem acesso às contas do condomínio');
+    D = await carregar();
+    CAN_WRITE = true;
+    document.body.classList.remove('ro');
     $('#login').hidden=true; $('#app').hidden=false;
     const anos = [...new Set(D.lancamentos.map(l=>+l.data.slice(0,4)).concat([hoje.getFullYear()]))].sort();
     $('#ano').innerHTML = anos.map(a=>`<option ${a===ANO?'selected':''}>${a}</option>`).join('');
     if(!anos.includes(ANO)) ANO = anos[anos.length-1];
     renderTudo();
-    setStatus(CAN_WRITE ? 'Acesso de edição' : 'Somente consulta');
-  } catch(e){ $('#login-msg').textContent = e.message; $('#login').hidden=false; $('#app').hidden=true; if(/inválida|401/.test(e.message)) localStorage.removeItem('cast_token'); }
+    setStatus(getEmail());
+  } catch(e){
+    $('#login-msg').textContent = e.message;
+    $('#login').hidden=false; $('#app').hidden=true;
+    if(/acesso|autoriz/i.test(e.message)) localStorage.removeItem('cast_email');
+  }
 }
-$('#login-btn').onclick = ()=>{ const t=$('#login-token').value.trim(); if(!t) return; localStorage.setItem('cast_token', t); entrar(); };
-$('#login-token').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#login-btn').click(); });
-$('#btn-sair').onclick = ()=>{ localStorage.removeItem('cast_token'); location.reload(); };
-$('#btn-reload').onclick = async ()=>{ try{ D = await ghLoad(); renderTudo(); toast('Atualizado'); }catch(e){ toast(e.message,true);} };
+$('#login-btn').onclick = ()=>{ const e=$('#login-email').value.trim(); if(!e) return; setEmail(e); entrar(); };
+$('#login-email').addEventListener('keydown', e=>{ if(e.key==='Enter') $('#login-btn').click(); });
+$('#btn-sair').onclick = ()=>{ localStorage.removeItem('cast_email'); location.reload(); };
+$('#btn-reload').onclick = async ()=>{ try{ D = await carregar(); renderTudo(); toast('Atualizado'); }catch(e){ toast(e.message,true);} };
 $('#ano').onchange = e => { ANO = +e.target.value; renderTudo(); };
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if(!b) return;
