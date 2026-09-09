@@ -341,9 +341,22 @@ async function api(rota, opts){
   return j;
 }
 
+// Ordem canonica dos cadastros. Fica num unico ponto, aplicado tanto ao que
+// chega do servidor quanto ao que e gravado: as tabelas, os dropdowns de
+// categoria e o arquivo no repositorio saem sempre na mesma ordem.
+// numeric:true faz o apto 101 vir antes do 1002 e a categoria "2.2" antes da
+// "2.10" — comparacao textual pura inverteria as duas.
+const ordCmp = new Intl.Collator('pt-BR', { numeric: true, sensitivity: 'base' });
+function ordenar(d){
+  if(Array.isArray(d.moradores))  d.moradores.sort((a,b)=> ordCmp.compare(a.apto||'', b.apto||''));
+  if(Array.isArray(d.categorias)) d.categorias.sort((a,b)=> ordCmp.compare(a||'', b||''));
+  if(Array.isArray(d.regras))     d.regras.sort((a,b)=> ordCmp.compare(a.categoria||'', b.categoria||'') || ordCmp.compare(a.chave||'', b.chave||''));
+  return d;
+}
+
 async function carregar(){
   const j = await api(`/castanheiras/dados?email=${encodeURIComponent(getEmail())}&t=${Date.now()}`);
-  return j.dados;
+  return ordenar(j.dados);
 }
 
 /** Aplica `mutator(D)` sobre a versao mais recente e grava via proxy. */
@@ -351,12 +364,13 @@ async function salvar(mutator, mensagem){
   if(!CAN_WRITE) throw new Error('Acesso somente leitura');
   const fresh = await carregar();
   mutator(fresh);
+  ordenar(fresh);
   const j = await api('/castanheiras/dados', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: getEmail(), dados: fresh, mensagem })
   });
-  D = j.dados; renderTudo();
+  D = ordenar(j.dados); renderTudo();
 }
 
 async function entrar(){
