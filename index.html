@@ -42,7 +42,7 @@ button{cursor:pointer}
 a{color:var(--accent)}
 
 /* ══ LAYOUT ══ */
-.wrap{max-width:1120px;margin:0 auto;padding:0 24px 70px}
+.wrap{max-width:1300px;margin:0 auto;padding:0 24px 70px}
 
 /* ══ HEADER ══ */
 header{background:var(--surface);border-bottom:2px solid var(--accent);position:sticky;top:0;z-index:100}
@@ -121,6 +121,11 @@ td.pago{background:var(--rec-soft);color:var(--green)}
 .tag.menos{background:var(--warn-soft);color:var(--amber)}
 .tag.mais{background:var(--rec-soft);color:var(--green)}
 td.mes-atual{box-shadow:inset 0 2px 0 var(--accent)}
+/* Tabelas de 12 meses + coluna Total: celulas compactas para caber na tela. */
+#tbl-resumo,#tbl-cotas,#tbl-despesas{font-size:12px}
+#tbl-resumo th,#tbl-resumo td,#tbl-cotas th,#tbl-cotas td,#tbl-despesas th,#tbl-despesas td{padding:9px 7px}
+#tbl-resumo th:first-child,#tbl-resumo td:first-child,#tbl-cotas th:first-child,#tbl-cotas td:first-child,#tbl-despesas th:first-child,#tbl-despesas td:first-child{padding-left:14px}
+#tbl-resumo th:last-child,#tbl-resumo td:last-child,#tbl-cotas th:last-child,#tbl-cotas td:last-child,#tbl-despesas th:last-child,#tbl-despesas td:last-child{padding-right:14px;border-left:1px solid var(--border-ctrl)}
 /* Valor diferente da cota cadastrada: nem "pago" nem "pendente" contam essa
    historia sozinhos, entao a celula ganha contorno de atencao. */
 td.dif{box-shadow:inset 0 0 0 1.5px var(--amber)}
@@ -360,7 +365,7 @@ body.ro .edit-only{display:none!important}
 // o arquivo e o proxy CDV (painel-cdv/index.js). Aqui so trafega o e-mail.
 const API = 'https://cdv-proxy-production.up.railway.app';
 const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
-const ROW_NO_MES = '1.2 - Cotas condominiais', ROW_ATRASO = '1.1 - Cotas em atraso';
+const ROW_NO_MES = '1.2 - Cotas condominiais', ROW_ATRASO = '1.1 - Cotas recebidas em atraso';
 // ==================================================
 
 const $ = s => document.querySelector(s);
