@@ -300,7 +300,7 @@ const fmtN = n => (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximum
 const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const r2 = n => Math.round(n*100)/100;
-let D = null, ANO = new Date().getFullYear(), CAN_WRITE = false, IMP = [];
+let D = null, ANO = new Date().getFullYear(), CAN_WRITE = false, IMP = [], FONTE_DESC = '';
 const hoje = new Date();
 
 function toast(msg, err){ const t=$('#toast'); t.textContent=msg; t.className='show'+(err?' err':''); clearTimeout(t._t); t._t=setTimeout(()=>t.className='',3500); }
@@ -575,6 +575,7 @@ async function lerArquivo(file){
   const buf = await file.arrayBuffer();
   let txt = new TextDecoder('utf-8').decode(buf);
   if (/\uFFFD/.test(txt) || /CHARSET:1252|ENCODING:USASCII/i.test(txt)) txt = new TextDecoder('windows-1252').decode(buf);
+  FONTE_DESC = '';
   const trans = /<OFX>|<STMTTRN>/i.test(txt) ? parseOFX(txt) : parseCSV(txt);
   if(!trans.length){ toast('Não encontrei transações no arquivo', true); return; }
   IMP = trans.map(classificar);
@@ -599,9 +600,18 @@ function parseCSV(txt){
   let hi=rows.findIndex(r=>r.some(c=>/data/i.test(c))&&r.some(c=>/valor|amount|cr[eé]dito|d[eé]bito/i.test(c)));
   let iData=0,iDesc=1,iVal=-1,iCred=-1,iDeb=-1;
   if(hi>=0){ const h=rows[hi].map(norm);
-    iData=h.findIndex(c=>/^DATA|DATE/.test(c)); iDesc=h.findIndex(c=>/DESCRI|HIST|MEMO|LANCAMENTO|TITULO/.test(c)); if(iDesc<0) iDesc=h.findIndex((c,i)=>i!==iData&&!/VALOR|SALDO|AMOUNT/.test(c));
+    iData=h.findIndex(c=>/^DATA|DATE/.test(c));
+    // Ordem importa: "Data Lancamento" casa com /LANCAMENTO/ e roubaria a vaga
+    // da coluna de descricao — por isso a coluna de data fica fora da busca e
+    // os rotulos inequivocos (Descricao, Historico, Memo) sao testados antes.
+    const ehData=(c,i)=> i===iData || /^DATA|DATE/.test(c);
+    const achaDesc = re => h.findIndex((c,i)=> !ehData(c,i) && !/VALOR|SALDO|AMOUNT/.test(c) && re.test(c));
+    iDesc = achaDesc(/DESCRI|HIST|MEMO|TITULO|IDENTIFICA|DETALHE/);
+    if(iDesc<0) iDesc = achaDesc(/LANCAMENTO|TRANSACAO|OPERACAO/);
+    if(iDesc<0) iDesc = h.findIndex((c,i)=> !ehData(c,i) && !/VALOR|SALDO|AMOUNT|TIPO|DOCUMENTO|NUMERO|AGENCIA|CONTA/.test(c));
     iVal=h.findIndex(c=>/^VALOR|AMOUNT|MONTANTE/.test(c)); iCred=h.findIndex(c=>/CREDITO|ENTRADA/.test(c)); iDeb=h.findIndex(c=>/DEBITO|SAIDA/.test(c));
-  } else { hi=-1; iVal=rows[0].length-1; }
+    FONTE_DESC = iDesc>=0 ? `coluna “${rows[hi][iDesc]}”` : 'coluna não identificada';
+  } else { hi=-1; iVal=rows[0].length-1; FONTE_DESC='arquivo sem cabeçalho'; }
   const out=[];
   for(let i=hi+1;i<rows.length;i++){ const r=rows[i]; const data=parseData(r[iData]); if(!data) continue;
     let valor=0,credito=true;
@@ -682,7 +692,7 @@ function renderImport(){
 function atualizarImpStatus(){
   const sel=IMP.filter(l=>l.incluir); const semDestino=sel.filter(l=>!l.destino).length;
   const rec=sel.filter(l=>l.tipo==='receita').reduce((s,l)=>s+l.valor,0), desp=sel.filter(l=>l.tipo==='despesa').reduce((s,l)=>s+l.valor,0);
-  $('#imp-status').textContent=`${sel.length} de ${IMP.length} selecionados · cotas ${fmt(rec)} · despesas ${fmt(desp)}`+(semDestino?` · ${semDestino} sem destino (não serão lançados)`:'');
+  $('#imp-status').textContent=`${sel.length} de ${IMP.length} selecionados · cotas ${fmt(rec)} · despesas ${fmt(desp)}`+(semDestino?` · ${semDestino} sem destino (não serão lançados)`:'')+(FONTE_DESC?` · descrição lida da ${FONTE_DESC}`:'');
   $('#btn-lancar').disabled=!sel.some(l=>l.destino);
 }
 $('#btn-lancar').onclick=async()=>{
