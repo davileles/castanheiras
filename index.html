@@ -152,6 +152,21 @@ tr.off td{opacity:.45}
 .drop input{display:none}
 .drop strong{color:var(--text);font-weight:800}
 
+/* ══ FILTROS ══ */
+.filtros{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 12px}
+.filtros .f{background:transparent;border:1px solid var(--border);border-radius:20px;color:var(--muted);font-size:11px;font-weight:700;padding:7px 14px;transition:all .15s}
+.filtros .f:hover{color:var(--text)}
+.filtros .f.active{color:var(--accent);border-color:var(--accent);background:rgba(250,81,80,.10)}
+
+/* Linha incompleta: fundo ambar discreto e faixa na primeira celula, para
+   sobressair sem competir com o vermelho de despesa. */
+tr.atencao td{background:rgba(251,191,36,.10);border-bottom-color:rgba(251,191,36,.28)}
+/* A faixa vai na 2a celula: os 3px da esquerda do card ja sao ocupados pela
+   listra vermelha, e um marcador ali ficaria escondido. */
+tr.atencao td:nth-child(2){box-shadow:inset 3px 0 0 var(--amber)}
+tr.atencao td:first-child{background:rgba(251,191,36,.10)}
+tr.atencao:hover td{background:rgba(251,191,36,.16)}
+
 /* ══ PILLS ══ */
 .pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px}
 .pill.rec{background:var(--rec-soft);color:var(--green)}
@@ -280,6 +295,12 @@ body.ro .edit-only{display:none!important}
       <span class="grow"></span>
       <label class="status">Mês de referência das cotas: <select id="imp-mesref" class="inline"></select></label>
       <button class="btn" id="btn-lancar">Lançar</button>
+    </div>
+    <div class="filtros" id="imp-filtros" hidden>
+      <button class="f active" data-f="todos">Todos</button>
+      <button class="f" data-f="atencao">Precisam de atenção</button>
+      <button class="f" data-f="ok">Prontos</button>
+      <button class="f" data-f="lancados">Já lançados</button>
     </div>
     <div class="card" id="imp-card" hidden><div class="scroll"><table id="tbl-import"></table></div></div>
   </section>
@@ -840,20 +861,47 @@ function alocarMesRef(lista){
   return lista;
 }
 
+let FILTRO_IMP = 'todos';
+
+// Uma linha precisa de revisao quando falta qualquer coisa para virar
+// lancamento: destino, valor ou o mes de referencia da cota. Sao essas que se
+// perdem no meio de 138 linhas se nada as diferenciar.
+function precisaAtencao(l){
+  if(l.jaLancado) return false;
+  if(!l.destino) return true;
+  if(!(l.valor > 0)) return true;
+  if(l.tipo === 'receita' && !l.mesRef) return true;
+  return false;
+}
+
 function renderImport(){
   if(!IMP.length) return;
+  // data-i continua sendo o indice original em IMP: a ordem da tela muda, os
+  // handlers nao. sort() e estavel, entao dentro de cada grupo a ordem
+  // cronologica do extrato e preservada.
+  const casa = ({l}) => FILTRO_IMP==='todos' || (FILTRO_IMP==='atencao' && precisaAtencao(l))
+    || (FILTRO_IMP==='ok' && !precisaAtencao(l) && !l.jaLancado) || (FILTRO_IMP==='lancados' && l.jaLancado);
+  const visiveis = IMP.map((l,i)=>({l,i})).filter(casa);
+  if(FILTRO_IMP==='todos') visiveis.sort((a,b)=> (precisaAtencao(b.l)?1:0) - (precisaAtencao(a.l)?1:0));
+  const nAtencao = IMP.filter(precisaAtencao).length;
+  $('#imp-filtros').hidden = false;
+  $('#imp-filtros').querySelectorAll('button.f').forEach(b=>{
+    b.classList.toggle('active', b.dataset.f===FILTRO_IMP);
+    if(b.dataset.f==='atencao') b.textContent = nAtencao ? `Precisam de atenção · ${nAtencao}` : 'Precisam de atenção';
+  });
   const optApto=v=>`<option value="">Escolher apto…</option>`+D.moradores.map(m=>`<option value="${esc(m.apto)}" ${m.apto===v?'selected':''}>${esc(m.apto)} · ${esc(m.nome)}</option>`).join('');
   const optCat=v=>`<option value="">Escolher categoria…</option>`+D.categorias.map(c=>`<option ${c===v?'selected':''}>${esc(c)}</option>`).join('');
   $('#tbl-import').innerHTML=`<thead><tr><th style="text-align:center"><input type="checkbox" id="chk-all" ${IMP.every(l=>l.incluir||l.jaLancado)?'checked':''}></th><th>Data</th><th style="text-align:left">Descrição</th><th>Valor</th><th style="text-align:left">Tipo</th><th style="text-align:left">Destino</th><th style="text-align:left">Mês ref.</th><th style="text-align:left">Classificação</th></tr></thead>
-  <tbody>${IMP.map((l,i)=>`<tr class="${l.incluir?'':'off'}" data-i="${i}">
+  <tbody>${visiveis.map(({l,i})=>`<tr class="${l.incluir?'':'off'}${precisaAtencao(l)?' atencao':''}" data-i="${i}">
     <td style="text-align:center"><input type="checkbox" data-k="incluir" ${l.incluir?'checked':''} ${l.jaLancado?'disabled':''}></td>
     <td>${fmtData(l.data)}</td><td class="desc">${esc(l.descricao)}</td>
     <td class="${l.tipo==='receita'?'rec':'desp'}">${l.credito?'+':'−'} ${fmtN(l.valor)}</td>
     <td style="text-align:left"><select class="inline" data-k="tipo"><option value="receita" ${l.tipo==='receita'?'selected':''}>Cota</option><option value="despesa" ${l.tipo==='despesa'?'selected':''}>Despesa</option></select></td>
     <td style="text-align:left"><select class="inline" data-k="destino">${l.tipo==='receita'?optApto(l.destino):optCat(l.destino)}</select></td>
     <td style="text-align:left">${l.tipo==='receita'?`<select class="inline" data-k="mesRef">${MESES.map(m=>`<option ${m===l.mesRef?'selected':''}>${m}</option>`).join('')}</select>`:`<span class="status">${l.mesPag}</span>`}</td>
-    <td style="text-align:left">${l.jaLancado?'<span class="pill dup">já lançado</span>':(l.destino?`<span class="pill ${l.tipo==='receita'?'rec':'desp'}">${esc(l.motivo)}</span>`:`<span class="pill warn">${esc(l.motivo)}</span>`)}</td>
+    <td style="text-align:left">${l.jaLancado?'<span class="pill dup">já lançado</span>':(l.destino?`<span class="pill ${l.tipo==='receita'?'rec':'desp'}">${esc(l.motivo)}</span>`:`<span class="pill warn">⚠ ${esc(l.motivo)}</span>`)}</td>
   </tr>`).join('')}</tbody>`;
+  if(!visiveis.length) $('#tbl-import').innerHTML = `<tr><td class="empty" style="text-align:center">Nenhuma linha neste filtro.</td></tr>`;
   atualizarImpStatus();
   $('#chk-all').onchange=e=>{ IMP.forEach(l=>{ if(!l.jaLancado) l.incluir=e.target.checked; }); renderImport(); };
   $('#tbl-import').onchange=e=>{ const tr=e.target.closest('tr[data-i]'); if(!tr) return; const l=IMP[tr.dataset.i]; const k=e.target.dataset.k;
@@ -866,6 +914,10 @@ function atualizarImpStatus(){
   $('#imp-status').textContent=`${sel.length} de ${IMP.length} selecionados · cotas ${fmt(rec)} · despesas ${fmt(desp)}`+(semDestino?` · ${semDestino} sem destino (não serão lançados)`:'')+(FONTE_DESC?` · descrição lida da ${FONTE_DESC}`:'');
   $('#btn-lancar').disabled=!sel.some(l=>l.destino);
 }
+$('#imp-filtros').onclick = e => {
+  const b = e.target.closest('button.f'); if(!b) return;
+  FILTRO_IMP = b.dataset.f; renderImport();
+};
 $('#btn-lancar').onclick=async()=>{
   const novos=IMP.filter(l=>l.incluir&&l.destino).map(l=>({id:l.id,data:l.data,descricao:l.descricao,valor:l.valor,tipo:l.tipo,destino:l.destino,mesRef:l.tipo==='receita'?l.mesRef:l.mesPag,origem:'extrato'}));
   if(!novos.length) return;
