@@ -1,0 +1,540 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Edifício Castanheiras — Contas</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#EEF1F4; --surface:#FFFFFF; --ink:#1B2A41; --muted:#6B7683; --line:#D8DEE4;
+  --rec:#2E7D5B; --rec-soft:#E3F1EA; --desp:#B54A3A; --desp-soft:#F6E5E1; --warn:#B7791F; --warn-soft:#FBF1DC;
+  --focus:#1B2A41;
+}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 "Instrument Sans",system-ui,sans-serif;font-feature-settings:"tnum" 1}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+a{color:inherit}
+.wrap{max-width:1120px;margin:0 auto;padding:0 20px 64px}
+
+/* Cabeçalho */
+header{background:var(--surface);border-bottom:1px solid var(--line)}
+header .wrap{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;padding-top:28px;padding-bottom:0}
+h1{margin:0;font-size:22px;font-weight:600;letter-spacing:-.01em}
+h1 small{display:block;font-size:14px;color:var(--muted);font-weight:400;margin-top:2px}
+.saldo{text-align:right;padding-bottom:16px}
+.saldo b{display:block;font-size:34px;font-weight:600;letter-spacing:-.02em;line-height:1.1}
+.saldo span{color:var(--muted);font-size:13px}
+nav{display:flex;gap:4px;overflow-x:auto}
+nav button{background:none;border:0;border-bottom:3px solid transparent;padding:12px 14px 10px;font-weight:500;color:var(--muted);white-space:nowrap}
+nav button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--ink)}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:22px 0 14px}
+.toolbar .grow{flex:1}
+.status{font-size:13px;color:var(--muted)}
+
+/* Botões */
+.btn{background:var(--ink);color:#fff;border:1px solid var(--ink);border-radius:6px;padding:8px 14px;font-weight:500}
+.btn.secondary{background:var(--surface);color:var(--ink);border-color:var(--line)}
+.btn.small{padding:5px 10px;font-size:13px}
+.btn:disabled{opacity:.5;cursor:default}
+input[type=text],input[type=number],select{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:7px 9px;min-width:0}
+input[type=number]{text-align:right}
+
+/* Tabelas */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.card + .card{margin-top:18px}
+.card h2{margin:0;padding:14px 16px;font-size:15px;font-weight:600;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}
+.card h2 .status{font-weight:400}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{padding:8px 10px;border-bottom:1px solid var(--line);white-space:nowrap;text-align:right}
+th{font-weight:500;color:var(--muted);background:#F7F9FA;position:sticky;top:0}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--surface);z-index:1}
+th:first-child{background:#F7F9FA}
+tr:last-child td{border-bottom:0}
+tfoot td{font-weight:600;border-top:1px solid var(--ink);background:#F7F9FA}
+td.zero{color:#B9C0C8}
+td.rec{color:var(--rec)} td.desp{color:var(--desp)}
+td.neg{color:var(--desp)}
+td.edit{cursor:pointer}
+td.edit:hover{background:#F2F5F8}
+td.pend{background:var(--desp-soft);color:var(--desp)}
+td.pago{background:var(--rec-soft);color:var(--rec)}
+td.mes-atual{box-shadow:inset 0 2px 0 var(--ink)}
+
+/* Resumo: barras por mês */
+.meses{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;padding:16px;align-items:end;height:190px}
+.mes{display:flex;flex-direction:column;justify-content:flex-end;gap:3px;height:100%;position:relative}
+.mes .bar{width:100%;display:flex;gap:2px;align-items:flex-end;flex:1}
+.mes .bar i{flex:1;border-radius:2px 2px 0 0;min-height:1px}
+.mes .bar i.r{background:var(--rec)} .mes .bar i.d{background:var(--desp)}
+.mes label{font-size:11px;color:var(--muted);text-align:center}
+.legend{display:flex;gap:16px;padding:0 16px 14px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.legend .r{background:var(--rec)} .legend .d{background:var(--desp)}
+
+/* Importação */
+.drop{border:1.5px dashed var(--line);border-radius:8px;padding:28px;text-align:center;background:var(--surface);color:var(--muted)}
+.drop.over{border-color:var(--ink);color:var(--ink)}
+.drop input{display:none}
+.drop strong{color:var(--ink);font-weight:500}
+.pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:500}
+.pill.rec{background:var(--rec-soft);color:var(--rec)} .pill.desp{background:var(--desp-soft);color:var(--desp)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)} .pill.dup{background:#EEF1F4;color:var(--muted)}
+tr.off td{opacity:.45}
+td.desc{text-align:left;white-space:normal;min-width:220px;max-width:360px}
+select.inline{padding:4px 6px;font-size:13px;max-width:240px}
+.result{padding:14px 16px;font-size:14px}
+.result ul{margin:8px 0 0;padding-left:18px;color:var(--muted)}
+.empty{padding:28px 16px;color:var(--muted);text-align:center}
+
+/* Cadastros */
+td input[type=text]{width:100%;min-width:120px} td input.apto{min-width:60px;width:70px} td input[type=number]{width:100px}
+td.acao{text-align:center;width:40px}
+.x{background:none;border:0;color:var(--muted);font-size:16px;line-height:1;padding:4px 8px;border-radius:4px}
+.x:hover{background:var(--desp-soft);color:var(--desp)}
+
+/* Toast */
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:10px 16px;border-radius:6px;font-size:14px;opacity:0;transition:.2s;pointer-events:none;max-width:90vw}
+#toast.show{opacity:1;transform:translateX(-50%)}
+#toast.err{background:var(--desp)}
+
+@media (max-width:720px){
+  header .wrap{flex-direction:column;align-items:stretch;gap:8px}
+  .saldo{text-align:left}
+  .meses{height:140px;gap:3px}
+  .mes label{font-size:9px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <div>
+      <h1 id="titulo">Edifício Castanheiras <small id="subtitulo">Demonstrativo financeiro</small></h1>
+      <nav role="tablist" id="tabs">
+        <button role="tab" data-tab="resumo" aria-selected="true">Resumo</button>
+        <button role="tab" data-tab="cotas">Cotas</button>
+        <button role="tab" data-tab="despesas">Despesas</button>
+        <button role="tab" data-tab="importar">Importar extrato</button>
+        <button role="tab" data-tab="cadastros">Moradores e regras</button>
+      </nav>
+    </div>
+    <div class="saldo">
+      <span id="saldo-label">Saldo atual</span>
+      <b id="saldo">—</b>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div class="toolbar">
+    <span class="status" id="status">Carregando planilha…</span>
+    <span class="grow"></span>
+    <a class="btn secondary small" id="link-planilha" target="_blank" rel="noopener">Abrir planilha</a>
+    <button class="btn secondary small" id="btn-reload">Atualizar</button>
+  </div>
+
+  <!-- RESUMO -->
+  <section id="tab-resumo">
+    <div class="card">
+      <h2>Receitas e despesas por mês <span class="status" id="resumo-ano"></span></h2>
+      <div class="meses" id="meses"></div>
+      <div class="legend"><span><i class="r"></i>Receitas</span><span><i class="d"></i>Despesas</span></div>
+    </div>
+    <div class="card">
+      <h2>Resumo financeiro</h2>
+      <div class="scroll"><table id="tbl-resumo"></table></div>
+    </div>
+    <div class="card">
+      <h2>Últimos lançamentos importados</h2>
+      <div class="scroll"><table id="tbl-ultimos"></table></div>
+    </div>
+  </section>
+
+  <!-- COTAS -->
+  <section id="tab-cotas" hidden>
+    <div class="card">
+      <h2>Cotas condominiais por apartamento <span class="status">Clique numa célula para registrar ou corrigir um valor</span></h2>
+      <div class="scroll"><table id="tbl-cotas"></table></div>
+    </div>
+  </section>
+
+  <!-- DESPESAS -->
+  <section id="tab-despesas" hidden>
+    <div class="card">
+      <h2>Despesas por categoria <span class="status">Clique numa célula para registrar ou corrigir um valor</span></h2>
+      <div class="scroll"><table id="tbl-despesas"></table></div>
+    </div>
+  </section>
+
+  <!-- IMPORTAR -->
+  <section id="tab-importar" hidden>
+    <label class="drop" id="drop">
+      <input type="file" id="file" accept=".ofx,.csv,.txt,.qfx">
+      <strong>Arraste o extrato aqui ou clique para escolher</strong><br>
+      Aceita OFX (exportado pelo banco) ou CSV. Créditos viram cotas dos apartamentos; débitos viram despesas.
+    </label>
+    <div class="toolbar" id="imp-toolbar" hidden>
+      <span class="status" id="imp-status"></span>
+      <span class="grow"></span>
+      <label class="status">Mês de referência das cotas:
+        <select id="imp-mesref" class="inline"></select>
+      </label>
+      <button class="btn" id="btn-lancar">Lançar na planilha</button>
+    </div>
+    <div class="card" id="imp-card" hidden>
+      <div class="scroll"><table id="tbl-import"></table></div>
+    </div>
+    <div class="card" id="imp-result" hidden><div class="result" id="imp-result-body"></div></div>
+  </section>
+
+  <!-- CADASTROS -->
+  <section id="tab-cadastros" hidden>
+    <div class="card">
+      <h2>Moradores <span><button class="btn secondary small" id="btn-add-morador">Adicionar</button> <button class="btn small" id="btn-save-moradores">Salvar moradores</button></span></h2>
+      <div class="scroll"><table id="tbl-moradores"></table></div>
+      <div class="result status">Nome e apelidos são usados para reconhecer o pagador no extrato. Separe apelidos por vírgula (ex.: "Maria Silva, M SILVA, MARIA S").</div>
+    </div>
+    <div class="card">
+      <h2>Regras de despesas <span><button class="btn secondary small" id="btn-add-regra">Adicionar</button> <button class="btn small" id="btn-save-regras">Salvar regras</button></span></h2>
+      <div class="scroll"><table id="tbl-regras"></table></div>
+      <div class="result status">Se a descrição do débito contiver a palavra-chave, ele é classificado na categoria escolhida.</div>
+    </div>
+  </section>
+</main>
+
+<div id="toast" role="status"></div>
+
+<script>
+// ================== CONFIGURAÇÃO ==================
+const APPS_SCRIPT_URL = 'COLE_AQUI_A_URL_DO_APPS_SCRIPT/exec';
+const PLANILHA_URL = 'https://docs.google.com/spreadsheets/d/1PmMk6s78WUhe1p0hu1iruvNUqwFpLrQfUilDwDsoeKk/edit';
+const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
+// ==================================================
+
+const $ = s => document.querySelector(s);
+const fmt = n => (n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
+const fmtN = n => (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let D = null;           // dados da planilha
+let IMP = [];           // lançamentos parseados do extrato
+const hoje = new Date();
+const mesAtualIdx = hoje.getMonth();
+
+$('#link-planilha').href = PLANILHA_URL;
+
+function toast(msg, err){ const t=$('#toast'); t.textContent=msg; t.className='show'+(err?' err':''); clearTimeout(t._t); t._t=setTimeout(()=>t.className='',3500); }
+function setStatus(msg){ $('#status').textContent = msg; }
+
+// ---------- API ----------
+async function apiGet(action){
+  const r = await fetch(`${APPS_SCRIPT_URL}?action=${action}`, {redirect:'follow'});
+  const j = await r.json(); if(!j.ok) throw new Error(j.error); return j.data;
+}
+async function apiPost(body){
+  const r = await fetch(APPS_SCRIPT_URL, {method:'POST', redirect:'follow', body: JSON.stringify(body)});
+  const j = await r.json(); if(!j.ok) throw new Error(j.error); return j.data;
+}
+
+async function carregar(){
+  if (APPS_SCRIPT_URL.startsWith('COLE_AQUI')) { setStatus('Configure APPS_SCRIPT_URL no index.html'); return; }
+  setStatus('Carregando planilha…');
+  try {
+    D = await apiGet('dados');
+    renderTudo();
+    setStatus(`Planilha lida às ${hoje.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}`);
+  } catch(e){ setStatus('Falha ao ler a planilha: ' + e.message); toast(e.message, true); }
+}
+
+// ---------- Abas ----------
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('button[data-tab]'); if(!b) return;
+  document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-selected', x===b));
+  document.querySelectorAll('main section').forEach(s=>s.hidden = s.id !== 'tab-'+b.dataset.tab);
+});
+$('#btn-reload').onclick = carregar;
+
+// ---------- Render ----------
+function renderTudo(){
+  $('#subtitulo').textContent = `Demonstrativo financeiro ${D.ano}`;
+  $('#resumo-ano').textContent = D.ano;
+  renderResumo(); renderCotas(); renderDespesas(); renderCadastros(); renderUltimos();
+  fillMesRef();
+}
+
+function totais(){
+  const rec = MESES.map((_,i)=>D.receitas.reduce((s,r)=>s+(r.meses[i]||0),0));
+  const desp = MESES.map((_,i)=>D.despesas.reduce((s,r)=>s+(r.meses[i]||0),0));
+  return {rec, desp};
+}
+
+function renderResumo(){
+  const {rec, desp} = totais();
+  const saldoRow = Object.keys(D.resumo).find(k=>/SALDO ATUAL/i.test(k));
+  const antRow = Object.keys(D.resumo).find(k=>/Anterior/i.test(k));
+  const saldo = saldoRow ? D.resumo[saldoRow] : [];
+  // último mês com movimento
+  let ult = -1; for(let i=0;i<12;i++) if(rec[i]||desp[i]) ult=i;
+  const idx = ult>=0 ? ult : 0;
+  $('#saldo').textContent = fmt(saldo[idx]||0);
+  $('#saldo-label').textContent = `Saldo em ${MESES[idx]} ${D.ano}`;
+
+  const max = Math.max(1,...rec,...desp);
+  $('#meses').innerHTML = MESES.map((m,i)=>`
+    <div class="mes" title="${m}: receitas ${fmt(rec[i])} · despesas ${fmt(desp[i])}">
+      <div class="bar"><i class="r" style="height:${rec[i]/max*100}%"></i><i class="d" style="height:${desp[i]/max*100}%"></i></div>
+      <label>${m}</label>
+    </div>`).join('');
+
+  const linhas = [
+    ['Saldo do mês anterior', antRow ? D.resumo[antRow] : []],
+    ['Receitas', rec, 'rec'],
+    ['Despesas', desp, 'desp'],
+    ['Resultado do mês', MESES.map((_,i)=>rec[i]-desp[i])],
+    ['Saldo atual', saldo],
+  ];
+  $('#tbl-resumo').innerHTML = `<thead><tr><th></th>${MESES.map((m,i)=>`<th class="${i===mesAtualIdx?'mes-atual':''}">${m}</th>`).join('')}</tr></thead>
+  <tbody>${linhas.map(([lab,vals,cls])=>`<tr><td>${lab}</td>${MESES.map((_,i)=>{
+    const v=vals[i]||0; return `<td class="${v===0?'zero':(cls||(v<0?'neg':''))}">${v===0?'—':fmtN(v)}</td>`;}).join('')}</tr>`).join('')}</tbody>`;
+}
+
+function renderCotas(){
+  const cotaPadrao = apto => (D.moradores.find(m=>m.apto===apto)||{}).valorCota || 0;
+  const totalMes = MESES.map((_,i)=>D.cotas.reduce((s,c)=>s+(c.meses[i]||0),0));
+  $('#tbl-cotas').innerHTML = `<thead><tr><th>Apto</th>${MESES.map((m,i)=>`<th class="${i===mesAtualIdx?'mes-atual':''}">${m}</th>`).join('')}<th>Total</th></tr></thead>
+  <tbody>${D.cotas.map(c=>{
+    const nome = (D.moradores.find(m=>m.apto===c.apto)||{}).nome;
+    const tot = c.meses.reduce((s,v)=>s+v,0);
+    return `<tr><td><b>${c.apto}</b>${nome?` <span class="status">${esc(nome.split(' ')[0])}</span>`:''}</td>${MESES.map((m,i)=>{
+      const v=c.meses[i]||0;
+      const vencido = i<=mesAtualIdx && D.ano<=hoje.getFullYear();
+      const cls = v>0 ? (v < cotaPadrao(c.apto) ? 'pend' : 'pago') : (vencido ? 'pend' : 'zero');
+      return `<td class="edit ${cls}" data-apto="${c.apto}" data-mes="${m}" data-v="${v}" title="Editar">${v?fmtN(v):(vencido?'pendente':'—')}</td>`;
+    }).join('')}<td><b>${fmtN(tot)}</b></td></tr>`;}).join('')}</tbody>
+  <tfoot><tr><td>Total</td>${totalMes.map(v=>`<td>${v?fmtN(v):'—'}</td>`).join('')}<td>${fmtN(totalMes.reduce((s,v)=>s+v,0))}</td></tr></tfoot>`;
+  $('#tbl-cotas').onclick = async e => {
+    const td = e.target.closest('td.edit'); if(!td) return;
+    const atual = Number(td.dataset.v)||0;
+    const s = prompt(`Cota do apto ${td.dataset.apto} em ${td.dataset.mes} (R$):`, atual ? fmtN(atual) : fmtN(cotaPadrao(td.dataset.apto)));
+    if (s===null) return;
+    const valor = parseBR(s);
+    try { await apiPost({action:'salvarCota', apto:td.dataset.apto, mes:td.dataset.mes, valor}); toast('Cota salva'); await carregar(); }
+    catch(err){ toast(err.message, true); }
+  };
+}
+
+function renderDespesas(){
+  const {desp} = totais();
+  $('#tbl-despesas').innerHTML = `<thead><tr><th>Categoria</th>${MESES.map((m,i)=>`<th class="${i===mesAtualIdx?'mes-atual':''}">${m}</th>`).join('')}<th>Total</th></tr></thead>
+  <tbody>${D.despesas.map(d=>`<tr><td>${esc(d.label)}</td>${MESES.map((m,i)=>{const v=d.meses[i]||0;
+    return `<td class="edit ${v?'':'zero'}" data-cat="${esc(d.label)}" data-mes="${m}" data-v="${v}">${v?fmtN(v):'—'}</td>`;}).join('')}<td><b>${fmtN(d.meses.reduce((s,v)=>s+v,0))}</b></td></tr>`).join('')}</tbody>
+  <tfoot><tr><td>Total</td>${desp.map(v=>`<td>${v?fmtN(v):'—'}</td>`).join('')}<td>${fmtN(desp.reduce((s,v)=>s+v,0))}</td></tr></tfoot>`;
+  $('#tbl-despesas').onclick = async e => {
+    const td = e.target.closest('td.edit'); if(!td) return;
+    const s = prompt(`${td.dataset.cat} em ${td.dataset.mes} — valor total do mês (R$):`, fmtN(Number(td.dataset.v)||0));
+    if (s===null) return;
+    try { await apiPost({action:'salvarDespesa', categoria:td.dataset.cat, mes:td.dataset.mes, valor:parseBR(s)}); toast('Despesa salva'); await carregar(); }
+    catch(err){ toast(err.message, true); }
+  };
+}
+
+function renderUltimos(){
+  const l = [...(D.lancamentos||[])].slice(-15).reverse();
+  if(!l.length){ $('#tbl-ultimos').innerHTML = `<tr><td class="empty" style="text-align:center">Nenhum extrato importado ainda. Use a aba “Importar extrato”.</td></tr>`; return; }
+  $('#tbl-ultimos').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left">Descrição</th><th style="text-align:left">Destino</th><th>Valor</th></tr></thead>
+  <tbody>${l.map(x=>`<tr><td>${fmtData(x.data)}</td><td class="desc">${esc(x.descricao)}</td><td style="text-align:left">${x.tipo==='receita'?`Apto ${esc(x.destino)} · ${esc(x.mesRef)}`:esc(x.destino)}</td><td class="${x.tipo}">${x.tipo==='receita'?'+':'−'} ${fmtN(x.valor)}</td></tr>`).join('')}</tbody>`;
+}
+
+function fmtData(s){ const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m ? `${m[3]}/${m[2]}/${m[1]}` : s; }
+function parseBR(s){ s=String(s).replace(/R\$|\s/g,''); if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:Math.round(n*100)/100; }
+
+// ---------- Cadastros ----------
+function renderCadastros(){
+  const M = D.moradores.length ? D.moradores : D.cotas.map(c=>({apto:c.apto,nome:'',apelidos:'',valorCota:0}));
+  $('#tbl-moradores').innerHTML = `<thead><tr><th>Apto</th><th style="text-align:left">Nome</th><th style="text-align:left">Apelidos no extrato</th><th>Cota (R$)</th><th></th></tr></thead>
+  <tbody>${M.map(m=>rowMorador(m)).join('')}</tbody>`;
+  $('#tbl-regras').innerHTML = `<thead><tr><th style="text-align:left">Palavra-chave</th><th style="text-align:left">Categoria</th><th></th></tr></thead>
+  <tbody>${D.regras.map(r=>rowRegra(r)).join('')}</tbody>`;
+}
+function rowMorador(m={}){ return `<tr><td><input type="text" class="apto" value="${esc(m.apto||'')}" data-k="apto"></td><td><input type="text" value="${esc(m.nome||'')}" data-k="nome"></td><td><input type="text" value="${esc(m.apelidos||'')}" data-k="apelidos"></td><td><input type="number" step="0.01" value="${m.valorCota||''}" data-k="valorCota"></td><td class="acao"><button class="x" title="Remover">×</button></td></tr>`; }
+function rowRegra(r={}){
+  const cats = (D.categoriasDespesa||[]);
+  return `<tr><td><input type="text" value="${esc(r.chave||'')}" data-k="chave"></td><td><select data-k="categoria" class="inline">${cats.map(c=>`<option ${c===r.categoria?'selected':''}>${esc(c)}</option>`).join('')}</select></td><td class="acao"><button class="x" title="Remover">×</button></td></tr>`;
+}
+function readRows(tbl){ return [...$(tbl).querySelectorAll('tbody tr')].map(tr=>{ const o={}; tr.querySelectorAll('[data-k]').forEach(el=>o[el.dataset.k]=el.type==='number'?Number(el.value)||0:el.value.trim()); return o; }); }
+document.addEventListener('click', e => { const x=e.target.closest('button.x'); if(x) x.closest('tr').remove(); });
+$('#btn-add-morador').onclick = ()=> $('#tbl-moradores tbody').insertAdjacentHTML('beforeend', rowMorador());
+$('#btn-add-regra').onclick = ()=> $('#tbl-regras tbody').insertAdjacentHTML('beforeend', rowRegra());
+$('#btn-save-moradores').onclick = async ()=>{ try{ await apiPost({action:'salvarMoradores', moradores:readRows('#tbl-moradores').filter(m=>m.apto)}); toast('Moradores salvos'); await carregar(); }catch(e){toast(e.message,true);} };
+$('#btn-save-regras').onclick = async ()=>{ try{ await apiPost({action:'salvarRegras', regras:readRows('#tbl-regras').filter(r=>r.chave)}); toast('Regras salvas'); await carregar(); }catch(e){toast(e.message,true);} };
+
+// ---------- Importação de extrato ----------
+const drop = $('#drop');
+['dragenter','dragover'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.add('over');}));
+['dragleave','drop'].forEach(ev=>drop.addEventListener(ev,e=>{e.preventDefault();drop.classList.remove('over');}));
+drop.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) lerArquivo(f); });
+$('#file').addEventListener('change', e=>{ if(e.target.files[0]) lerArquivo(e.target.files[0]); e.target.value=''; });
+
+function fillMesRef(){
+  const sel = $('#imp-mesref');
+  sel.innerHTML = `<option value="">Mês do pagamento</option>` + MESES.map(m=>`<option value="${m}">${m}</option>`).join('');
+  sel.onchange = ()=>{ IMP.forEach(l=>{ if(l.tipo==='receita' && !l.mesRefManual) l.mesRef = sel.value || l.mesPag; }); renderImport(); };
+}
+
+async function lerArquivo(file){
+  if(!D){ toast('Aguarde a planilha carregar', true); return; }
+  const buf = await file.arrayBuffer();
+  let txt = new TextDecoder('utf-8').decode(buf);
+  if (/\uFFFD/.test(txt) || /CHARSET:1252|ENCODING:USASCII/i.test(txt)) txt = new TextDecoder('windows-1252').decode(buf);
+  let trans;
+  if (/<OFX>|<STMTTRN>/i.test(txt)) trans = parseOFX(txt);
+  else trans = parseCSV(txt);
+  if(!trans.length){ toast('Não encontrei transações no arquivo', true); return; }
+  IMP = trans.map(classificar);
+  $('#imp-toolbar').hidden = false; $('#imp-card').hidden = false; $('#imp-result').hidden = true;
+  renderImport();
+}
+
+function parseOFX(txt){
+  const out = [];
+  const blocks = txt.match(/<STMTTRN>[\s\S]*?(?=<\/STMTTRN>|<STMTTRN>|<\/BANKTRANLIST>)/gi) || [];
+  const tag = (b,t)=>{ const m=b.match(new RegExp(`<${t}>([^<\\r\\n]*)`,'i')); return m?m[1].trim():''; };
+  for(const b of blocks){
+    const dt = tag(b,'DTPOSTED'); const amt = parseFloat(tag(b,'TRNAMT').replace(',','.'));
+    if(!dt || isNaN(amt)) continue;
+    const data = `${dt.slice(0,4)}-${dt.slice(4,6)}-${dt.slice(6,8)}`;
+    const desc = [tag(b,'NAME'), tag(b,'MEMO')].filter(Boolean).join(' — ');
+    const id = tag(b,'FITID') || hash(data+desc+amt);
+    out.push({id, data, descricao:desc, valor:Math.abs(amt), credito: amt>0});
+  }
+  return out;
+}
+
+function parseCSV(txt){
+  const lines = txt.split(/\r?\n/).filter(l=>l.trim());
+  if(lines.length<2) return [];
+  const sep = [';','\t',','].map(s=>[s,(lines[0].split(s).length)]).sort((a,b)=>b[1]-a[1])[0][0];
+  const split = l => { const o=[]; let cur='',q=false; for(const ch of l){ if(ch==='"'){q=!q;continue;} if(ch===sep&&!q){o.push(cur);cur='';} else cur+=ch; } o.push(cur); return o.map(s=>s.trim()); };
+  const rows = lines.map(split);
+  // localizar cabeçalho
+  let hi = rows.findIndex(r => r.some(c=>/data/i.test(c)) && r.some(c=>/valor|amount|cr[eé]dito|d[eé]bito/i.test(c)));
+  let iData=0,iDesc=1,iVal=-1,iCred=-1,iDeb=-1;
+  if(hi>=0){
+    const h = rows[hi].map(c=>norm(c));
+    iData = h.findIndex(c=>/^DATA|DATE/.test(c));
+    iDesc = h.findIndex(c=>/DESCRI|HIST|MEMO|LANCAMENTO|TITULO/.test(c)); if(iDesc<0) iDesc = h.findIndex((c,i)=>i!==iData && !/VALOR|SALDO|AMOUNT/.test(c));
+    iVal = h.findIndex(c=>/^VALOR|AMOUNT|MONTANTE/.test(c));
+    iCred = h.findIndex(c=>/CREDITO|ENTRADA/.test(c)); iDeb = h.findIndex(c=>/DEBITO|SAIDA/.test(c));
+  } else { hi=-1; iVal = rows[0].length-1; }
+  const out=[];
+  for(let i=hi+1;i<rows.length;i++){
+    const r=rows[i]; const data = parseData(r[iData]); if(!data) continue;
+    let valor=0, credito=true;
+    if(iVal>=0 && r[iVal]){ const v=parseBR(r[iVal]); if(!v) continue; valor=Math.abs(v); credito = v>0 && !/^-/.test(r[iVal].trim()); }
+    else if(iCred>=0||iDeb>=0){ const c=iCred>=0?parseBR(r[iCred]):0, d=iDeb>=0?parseBR(r[iDeb]):0; if(c){valor=Math.abs(c);credito=true;} else if(d){valor=Math.abs(d);credito=false;} else continue; }
+    else continue;
+    const descricao = r[iDesc]||'';
+    if(/SALDO/i.test(descricao) && !/PIX|TED|TRANSF/i.test(descricao)) continue;
+    out.push({id:hash(data+descricao+valor+(credito?'C':'D')), data, descricao, valor, credito});
+  }
+  return out;
+}
+function parseData(s){ if(!s) return null; s=String(s).trim(); let m=s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/); if(m) return `${m[3]}-${m[2]}-${m[1]}`; m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`; m=s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{2})$/); if(m) return `20${m[3]}-${m[2]}-${m[1]}`; return null; }
+function hash(s){ let h=0; for(const ch of s) h=(h*31+ch.charCodeAt(0))|0; return 'H'+(h>>>0).toString(36); }
+
+function classificar(t){
+  const d = norm(t.descricao);
+  const l = {...t, tipo: t.credito?'receita':'despesa', destino:'', motivo:'', mesPag: MESES[new Date(t.data+'T12:00:00').getMonth()], incluir:true};
+  l.mesRef = $('#imp-mesref').value || l.mesPag;
+  l.jaLancado = (D.lancamentos||[]).some(x=>x.id===l.id);
+  if(l.jaLancado) l.incluir=false;
+  if(t.credito){
+    // 1) número do apto na descrição
+    const ap = d.match(/\b(?:AP|APT|APTO|APARTAMENTO|UNIDADE)\s*0?(\d{3,4})\b/);
+    if(ap && D.cotas.some(c=>c.apto===ap[1])){ l.destino=ap[1]; l.motivo='nº do apto na descrição'; }
+    // 2) nome / apelidos
+    if(!l.destino){
+      for(const m of D.moradores){
+        const tokens=[m.nome, ...String(m.apelidos||'').split(',')].map(norm).filter(x=>x.length>=3);
+        if(tokens.some(tok=>d.includes(tok))){ l.destino=m.apto; l.motivo=`pagador: ${m.nome||m.apto}`; break; }
+      }
+    }
+    // 3) valor igual à cota de um único apto ainda sem pagamento no mês
+    if(!l.destino){
+      const mi = MESES.indexOf(l.mesRef);
+      const cand = D.moradores.filter(m=>Math.abs(m.valorCota-t.valor)<0.01 && !(D.cotas.find(c=>c.apto===m.apto)||{meses:[]}).meses[mi]);
+      if(cand.length===1){ l.destino=cand[0].apto; l.motivo='valor da cota (confirmar)'; }
+    }
+    if(!l.destino) l.motivo='pagador não reconhecido';
+  } else {
+    const regra = D.regras.find(r=>r.chave && d.includes(norm(r.chave)));
+    if(regra){ l.destino=regra.categoria; l.motivo=`regra “${regra.chave}”`; }
+    else if(/PIX|TED|TRANSF/i.test(d) && D.moradores.some(m=>m.nome && d.includes(norm(m.nome)))) { l.tipo='despesa'; l.motivo='transferência para morador (reembolso?)'; }
+    else l.motivo='sem regra — escolha a categoria';
+  }
+  return l;
+}
+
+function renderImport(){
+  const cats = D.categoriasDespesa;
+  const optApto = v => `<option value="">Escolher apto…</option>`+D.cotas.map(c=>{const n=(D.moradores.find(m=>m.apto===c.apto)||{}).nome; return `<option value="${c.apto}" ${c.apto===v?'selected':''}>${c.apto}${n?' · '+esc(n.split(' ')[0]):''}</option>`;}).join('');
+  const optCat = v => `<option value="">Escolher categoria…</option>`+cats.map(c=>`<option ${c===v?'selected':''}>${esc(c)}</option>`).join('');
+  $('#tbl-import').innerHTML = `<thead><tr><th style="text-align:center"><input type="checkbox" id="chk-all" ${IMP.every(l=>l.incluir||l.jaLancado)?'checked':''}></th><th>Data</th><th style="text-align:left">Descrição</th><th>Valor</th><th style="text-align:left">Tipo</th><th style="text-align:left">Destino</th><th style="text-align:left">Mês ref.</th><th style="text-align:left">Classificação</th></tr></thead>
+  <tbody>${IMP.map((l,i)=>`<tr class="${l.incluir?'':'off'}" data-i="${i}">
+    <td style="text-align:center"><input type="checkbox" data-k="incluir" ${l.incluir?'checked':''} ${l.jaLancado?'disabled':''}></td>
+    <td>${fmtData(l.data)}</td>
+    <td class="desc">${esc(l.descricao)}</td>
+    <td class="${l.tipo}">${l.credito?'+':'−'} ${fmtN(l.valor)}</td>
+    <td style="text-align:left"><select class="inline" data-k="tipo"><option value="receita" ${l.tipo==='receita'?'selected':''}>Cota</option><option value="despesa" ${l.tipo==='despesa'?'selected':''}>Despesa</option></select></td>
+    <td style="text-align:left"><select class="inline" data-k="destino">${l.tipo==='receita'?optApto(l.destino):optCat(l.destino)}</select></td>
+    <td style="text-align:left">${l.tipo==='receita'?`<select class="inline" data-k="mesRef">${MESES.map(m=>`<option ${m===l.mesRef?'selected':''}>${m}</option>`).join('')}</select>`:`<span class="status">${l.mesPag}</span>`}</td>
+    <td style="text-align:left">${l.jaLancado?'<span class="pill dup">já lançado</span>':(l.destino?`<span class="pill ${l.tipo}">${esc(l.motivo)}</span>`:`<span class="pill warn">${esc(l.motivo)}</span>`)}</td>
+  </tr>`).join('')}</tbody>`;
+  atualizarImpStatus();
+  $('#chk-all').onchange = e => { IMP.forEach(l=>{ if(!l.jaLancado) l.incluir=e.target.checked; }); renderImport(); };
+  $('#tbl-import').onchange = e => {
+    const tr=e.target.closest('tr[data-i]'); if(!tr) return; const l=IMP[tr.dataset.i]; const k=e.target.dataset.k;
+    if(k==='incluir') l.incluir=e.target.checked;
+    else if(k==='tipo'){ l.tipo=e.target.value; l.destino=''; l.motivo='definido manualmente'; }
+    else if(k==='destino'){ l.destino=e.target.value; l.motivo='definido manualmente'; }
+    else if(k==='mesRef'){ l.mesRef=e.target.value; l.mesRefManual=true; }
+    renderImport();
+  };
+}
+function atualizarImpStatus(){
+  const sel = IMP.filter(l=>l.incluir);
+  const semDestino = sel.filter(l=>!l.destino).length;
+  const rec = sel.filter(l=>l.tipo==='receita').reduce((s,l)=>s+l.valor,0);
+  const desp = sel.filter(l=>l.tipo==='despesa').reduce((s,l)=>s+l.valor,0);
+  $('#imp-status').textContent = `${sel.length} de ${IMP.length} selecionados · cotas ${fmt(rec)} · despesas ${fmt(desp)}` + (semDestino?` · ${semDestino} sem destino (não serão lançados)`:'');
+  $('#btn-lancar').disabled = !sel.some(l=>l.destino);
+}
+$('#btn-lancar').onclick = async ()=>{
+  const lancs = IMP.filter(l=>l.incluir && l.destino).map(l=>({id:l.id,data:l.data,descricao:l.descricao,valor:l.valor,tipo:l.tipo,destino:l.destino,mesRef:l.tipo==='receita'?l.mesRef:l.mesPag}));
+  if(!lancs.length) return;
+  if(!confirm(`Lançar ${lancs.length} transações na planilha? Os valores serão somados aos já existentes.`)) return;
+  $('#btn-lancar').disabled = true; $('#btn-lancar').textContent='Lançando…';
+  try{
+    const r = await apiPost({action:'importar', lancamentos:lancs});
+    $('#imp-result').hidden=false;
+    $('#imp-result-body').innerHTML = `<b>${r.gravados} lançamentos gravados</b>${r.duplicados?`, ${r.duplicados} já existiam`:''}${r.ignorados.length?`, ${r.ignorados.length} ignorados`:''}.`
+      + (r.avisos.length?`<ul>${r.avisos.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:'')
+      + (r.ignorados.length?`<ul>${r.ignorados.map(a=>`<li>${esc(a)}</li>`).join('')}</ul>`:'');
+    toast(`${r.gravados} lançamentos gravados`);
+    await carregar();
+    IMP = IMP.map(classificar); renderImport();
+  }catch(e){ toast(e.message,true); }
+  finally{ $('#btn-lancar').textContent='Lançar na planilha'; atualizarImpStatus(); }
+};
+
+carregar();
+</script>
+</body>
+</html>
