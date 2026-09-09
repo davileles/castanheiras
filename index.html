@@ -268,7 +268,7 @@ body.ro .edit-only{display:none!important}
     <div class="card">
       <h2>Moradores <span><button class="btn secondary small" id="btn-add-morador">Adicionar</button> <button class="btn small" id="btn-save-moradores">Salvar moradores</button></span></h2>
       <div class="scroll"><table id="tbl-moradores"></table></div>
-      <div class="result status">Nome e apelidos são usados para reconhecer o pagador no extrato. Separe apelidos por vírgula.</div>
+      <div class="result status">Nome e apelidos são usados para reconhecer o pagador no extrato. Separe apelidos por vírgula ou ponto e vírgula.</div>
     </div>
     <div class="card">
       <h2>Regras de despesas <span><button class="btn secondary small" id="btn-add-regra">Adicionar</button> <button class="btn small" id="btn-save-regras">Salvar regras</button></span></h2>
@@ -613,6 +613,20 @@ function parseCSV(txt){
   }
   return out;
 }
+// O nome no extrato quase nunca bate por inteiro com o cadastro: o banco
+// abrevia, corta sobrenome, inverte a ordem ou junta com o tipo da operacao
+// ("PIX RECEBIDO ..."). Por isso a comparacao e por token, nao pela string
+// toda — era o que fazia todo credito cair em "pagador nao reconhecido".
+const STOP_NOME = new Set(['DE','DA','DO','DAS','DOS','E','DI','DU']);
+function tokensNome(txt){
+  return norm(txt).split(' ').filter(tk => tk.length >= 3 && !STOP_NOME.has(tk));
+}
+function tokensDoMorador(m){
+  // Apelidos aceitam virgula e ponto e virgula como separador.
+  const partes = [m.nome, ...String(m.apelidos || '').split(/[;,\n]/)];
+  return [...new Set(partes.flatMap(tokensNome))];
+}
+
 function classificar(t){
   const d=norm(t.descricao); const mp=MESES[+t.data.slice(5,7)-1];
   const l={...t, tipo:t.credito?'receita':'despesa', destino:'', motivo:'', mesPag:mp, incluir:true};
@@ -621,7 +635,22 @@ function classificar(t){
   if(t.credito){
     const ap=d.match(/\b(?:AP|APT|APTO|APARTAMENTO|UNIDADE)\s*0?(\d{3,4})\b/);
     if(ap&&D.moradores.some(m=>m.apto===ap[1])){ l.destino=ap[1]; l.motivo='nº do apto na descrição'; }
-    if(!l.destino) for(const m of D.moradores){ const toks=[m.nome,...String(m.apelidos||'').split(',')].map(norm).filter(x=>x.length>=3); if(toks.some(tk=>d.includes(tk))){ l.destino=m.apto; l.motivo=`pagador: ${m.nome}`; break; } }
+    if(!l.destino){
+      // Token repetido em mais de um morador (sobrenome de familia, por
+      // exemplo) nao decide sozinho; so vale como reforco.
+      const freq={}; D.moradores.forEach(m=>tokensDoMorador(m).forEach(tk=>{freq[tk]=(freq[tk]||0)+1;}));
+      const placar = D.moradores
+        .map(m => ({ m, hits: tokensDoMorador(m).filter(tk => d.includes(tk)) }))
+        .filter(p => p.hits.length)
+        .sort((a,b) => b.hits.length - a.hits.length);
+      const alvo = placar[0];
+      const empate = placar[1] && placar[1].hits.length === alvo.hits.length;
+      // Aceita com dois tokens quaisquer, ou com um unico token que seja
+      // exclusivo daquele morador e longo o bastante para nao ser coincidencia.
+      const forte = alvo && (alvo.hits.length >= 2 || alvo.hits.some(tk => tk.length >= 4 && freq[tk] === 1));
+      if(alvo && !empate && forte){ l.destino=alvo.m.apto; l.motivo=`pagador: ${alvo.m.nome}`; }
+      else if(empate) l.motivo='mais de um morador combina — escolha o apto';
+    }
     if(!l.destino){ const C=calc(); const mi=mesIdx(l.mesRef); const cand=D.moradores.filter(m=>Math.abs(m.valorCota-t.valor)<0.01&&!(C.cotas[m.apto]||[])[mi]); if(cand.length===1){ l.destino=cand[0].apto; l.motivo='valor da cota (confirmar)'; } }
     if(!l.destino) l.motivo='pagador não reconhecido';
   } else {
