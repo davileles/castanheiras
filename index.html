@@ -117,6 +117,12 @@ td.desc{text-align:left;white-space:normal;min-width:220px;max-width:360px;font-
 td input[type=text]{width:100%;min-width:120px} td input.apto{min-width:60px;width:70px} td input[type=number]{width:100px}
 td.acao{text-align:center;width:40px}
 select.inline{padding:5px 8px;font-size:12px;max-width:240px;border-radius:8px}
+/* Dentro da tabela o select herdaria width:100% da celula e ficaria estreito
+   demais para ler "202 - Guilherme e Ionara" ou "Conservadora". */
+td select.inline{width:auto}
+td select[data-k="tipo"]{min-width:96px}
+td select[data-k="destino"]{min-width:190px}
+td select[data-k="mesRef"]{min-width:78px}
 tr.off td{opacity:.45}
 
 /* ══ GRAFICO DE MESES ══ */
@@ -594,31 +600,33 @@ function parseOFX(txt){
 }
 function parseCSV(txt){
   const lines=txt.split(/\r?\n/).filter(l=>l.trim()); if(lines.length<2) return [];
-  const sep=[';','\t',','].map(s=>[s,lines[0].split(s).length]).sort((a,b)=>b[1]-a[1])[0][0];
+  const sep=[';','\t',','].map(s=>[s,lines.slice(0,12).reduce((mx,l)=>Math.max(mx,l.split(s).length),1)]).sort((a,b)=>b[1]-a[1])[0][0];
   const split=l=>{ const o=[]; let cur='',q=false; for(const ch of l){ if(ch==='"'){q=!q;continue;} if(ch===sep&&!q){o.push(cur);cur='';} else cur+=ch; } o.push(cur); return o.map(s=>s.trim()); };
   const rows=lines.map(split);
   let hi=rows.findIndex(r=>r.some(c=>/data/i.test(c))&&r.some(c=>/valor|amount|cr[eé]dito|d[eé]bito/i.test(c)));
-  let iData=0,iDesc=1,iVal=-1,iCred=-1,iDeb=-1;
+  let iData=0,iDescs=[1],iVal=-1,iCred=-1,iDeb=-1;
   if(hi>=0){ const h=rows[hi].map(norm);
     iData=h.findIndex(c=>/^DATA|DATE/.test(c));
-    // Ordem importa: "Data Lancamento" casa com /LANCAMENTO/ e roubaria a vaga
-    // da coluna de descricao — por isso a coluna de data fica fora da busca e
-    // os rotulos inequivocos (Descricao, Historico, Memo) sao testados antes.
+    // O extrato separa o tipo da operacao ("Pix recebido") do nome de quem
+    // pagou ("Agda ... Leles") em duas colunas — Historico e Descricao. As duas
+    // juntas formam a descricao: ficar so com uma perde o pagador ou o tipo.
+    // A coluna de data fica fora da busca porque "Data Lancamento" casa com
+    // /LANCAMENTO/ e roubaria a vaga.
     const ehData=(c,i)=> i===iData || /^DATA|DATE/.test(c);
-    const achaDesc = re => h.findIndex((c,i)=> !ehData(c,i) && !/VALOR|SALDO|AMOUNT/.test(c) && re.test(c));
-    iDesc = achaDesc(/DESCRI|HIST|MEMO|TITULO|IDENTIFICA|DETALHE/);
-    if(iDesc<0) iDesc = achaDesc(/LANCAMENTO|TRANSACAO|OPERACAO/);
-    if(iDesc<0) iDesc = h.findIndex((c,i)=> !ehData(c,i) && !/VALOR|SALDO|AMOUNT|TIPO|DOCUMENTO|NUMERO|AGENCIA|CONTA/.test(c));
+    const util=(c,i)=> !ehData(c,i) && !/VALOR|SALDO|AMOUNT|MONTANTE/.test(c);
+    iDescs = h.map((c,i)=>i).filter(i=> util(h[i],i) && /DESCRI|HIST|MEMO|TITULO|IDENTIFICA|DETALHE|LANCAMENTO|TRANSACAO|OPERACAO/.test(h[i]));
+    if(!iDescs.length){ const i=h.findIndex((c,j)=> util(c,j) && !/TIPO|DOCUMENTO|NUMERO|AGENCIA|CONTA/.test(c)); if(i>=0) iDescs=[i]; }
     iVal=h.findIndex(c=>/^VALOR|AMOUNT|MONTANTE/.test(c)); iCred=h.findIndex(c=>/CREDITO|ENTRADA/.test(c)); iDeb=h.findIndex(c=>/DEBITO|SAIDA/.test(c));
-    FONTE_DESC = iDesc>=0 ? `coluna “${rows[hi][iDesc]}”` : 'coluna não identificada';
-  } else { hi=-1; iVal=rows[0].length-1; FONTE_DESC='arquivo sem cabeçalho'; }
+    FONTE_DESC = iDescs.length ? `coluna ${iDescs.map(i=>`“${rows[hi][i]}”`).join(' + ')}` : 'coluna não identificada';
+  } else { hi=-1; iVal=rows[0].length-1; iDescs=[1]; FONTE_DESC='arquivo sem cabeçalho'; }
   const out=[];
   for(let i=hi+1;i<rows.length;i++){ const r=rows[i]; const data=parseData(r[iData]); if(!data) continue;
     let valor=0,credito=true;
     if(iVal>=0&&r[iVal]){ const v=parseBR(r[iVal]); if(!v) continue; valor=Math.abs(v); credito=v>0&&!/^-/.test(r[iVal].trim()); }
     else if(iCred>=0||iDeb>=0){ const c=iCred>=0?parseBR(r[iCred]):0,d=iDeb>=0?parseBR(r[iDeb]):0; if(c){valor=Math.abs(c);credito=true;} else if(d){valor=Math.abs(d);credito=false;} else continue; }
     else continue;
-    const descricao=r[iDesc]||''; if(/SALDO/i.test(descricao)&&!/PIX|TED|TRANSF/i.test(descricao)) continue;
+    const descricao=iDescs.map(i=>r[i]).filter(Boolean).join(' — '); if(!descricao) continue;
+    if(/SALDO/i.test(descricao)&&!/PIX|TED|TRANSF/i.test(descricao)) continue;
     out.push({id:hash(data+descricao+valor+(credito?'C':'D')), data, descricao, valor, credito});
   }
   return out;
