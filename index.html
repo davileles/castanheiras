@@ -52,7 +52,10 @@ h1{font-size:17px;font-weight:800;letter-spacing:-.3px;line-height:1.1}
 h1 small{display:block;font-size:10px;font-weight:700;color:var(--accent);letter-spacing:1.2px;text-transform:uppercase;margin-top:4px}
 .saldo{text-align:right;padding-bottom:14px;display:flex;align-items:center;gap:14px}
 .saldo div{text-align:right}
-.saldo b{display:block;font-size:26px;font-weight:800;letter-spacing:-.5px;line-height:1.15}
+.saldo b{display:block;font-size:24px;font-weight:800;letter-spacing:-.5px;line-height:1.15}
+.saldo b.neg{color:var(--red)}
+.saldo .sec b{font-size:15px;font-weight:700;color:var(--muted)}
+.saldo .sep{width:1px;align-self:stretch;background:var(--border);margin:2px 0}
 .saldo span{color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
 .theme-btn{background:transparent;border:1px solid var(--border-ctrl);color:var(--muted);width:34px;height:34px;border-radius:10px;font-size:15px;display:flex;align-items:center;justify-content:center;transition:all .15s;flex-shrink:0}
 .theme-btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -136,15 +139,26 @@ td select[data-k="mesRef"]{min-width:78px}
 tr.off td{opacity:.45}
 
 /* ══ GRAFICO DE MESES ══ */
-.meses{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;padding:18px;align-items:end;height:190px}
+.meses{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;padding:14px 18px 18px;align-items:end;height:212px}
 .mes{display:flex;flex-direction:column;justify-content:flex-end;gap:3px;height:100%}
 .mes .bar{width:100%;display:flex;gap:2px;align-items:flex-end;flex:1}
 .mes .bar i{flex:1;border-radius:3px 3px 0 0;min-height:1px}
 .mes .bar i.r{background:var(--green)} .mes .bar i.d{background:var(--red)}
+.mes .vals{display:flex;flex-direction:column;gap:1px;text-align:center;line-height:1.3;min-height:26px;justify-content:flex-end}
+.mes .vals b{font-size:9px;font-weight:700;letter-spacing:-.2px;font-feature-settings:"tnum" 1}
+.mes .vals b.r{color:var(--green)} .mes .vals b.d{color:var(--red)}
+.mes .vals b.zero{color:var(--muted2);font-weight:600}
 .mes label{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center}
 .legend{display:flex;gap:16px;padding:0 18px 16px;font-size:11px;font-weight:600;color:var(--muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
 .legend .r{background:var(--green)} .legend .d{background:var(--red)}
+
+/* ══ KPIs DO MES ══ */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 18px 18px}
+.kpi{background:var(--card-deep);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
+.kpi span{display:block;font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px}
+.kpi b{display:block;font-size:19px;font-weight:800;letter-spacing:-.4px;margin-top:5px}
+.kpi b.pos{color:var(--green)} .kpi b.neg{color:var(--red)} .kpi b.off{color:var(--muted)}
 
 /* ══ IMPORTACAO ══ */
 .drop{border:1.5px dashed var(--border-ctrl);border-radius:14px;padding:32px;text-align:center;background:var(--surface);color:var(--muted);display:block;font-size:12.5px;font-weight:600;transition:all .15s}
@@ -197,7 +211,11 @@ body.ro .edit-only{display:none!important}
   header .wrap{flex-direction:column;align-items:stretch;gap:10px}
   .saldo{text-align:left;padding-bottom:10px;justify-content:space-between}
   .saldo div{text-align:left}
-  .meses{height:150px;gap:3px;padding:14px} .mes label{font-size:8px}
+  .meses{height:172px;gap:3px;padding:12px 14px 14px} .mes label{font-size:8px}
+  .mes .vals b{font-size:7.5px} .mes .vals{min-height:22px}
+  .kpis{grid-template-columns:repeat(2,1fr);gap:8px;padding:0 14px 14px}
+  .kpi b{font-size:16px}
+  .saldo b{font-size:20px} .saldo .sec b{font-size:14px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -229,9 +247,14 @@ body.ro .edit-only{display:none!important}
       </nav>
     </div>
     <div class="saldo">
-      <div>
+      <div class="sec">
         <span id="saldo-label">Saldo atual</span>
         <b id="saldo">—</b>
+      </div>
+      <div class="sep"></div>
+      <div>
+        <span>Saldo da conta</span>
+        <b id="saldo-geral" title="Saldo consolidado de todos os anos">—</b>
       </div>
       <button class="theme-btn" id="theme-btn" title="Alternar tema">☀</button>
     </div>
@@ -249,8 +272,9 @@ body.ro .edit-only{display:none!important}
 
   <section id="tab-resumo">
     <div class="card">
-      <h2>Receitas e despesas por mês</h2>
+      <h2>Receitas e despesas por mês <span class="status" id="kpi-mes"></span></h2>
       <div class="meses" id="meses"></div>
+      <div class="kpis" id="kpis"></div>
       <div class="legend"><span><i class="r"></i>Receitas</span><span><i class="d"></i>Despesas</span></div>
     </div>
     <div class="card" id="card-diverg" hidden>
@@ -338,6 +362,11 @@ const ROW_NO_MES = '1.2 - Cotas condominiais', ROW_ATRASO = '1.1 - Cotas em atra
 const $ = s => document.querySelector(s);
 const fmt = n => (n||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'});
 const fmtN = n => (n||0).toLocaleString('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+// valor compacto para os rotulos das barras: 1.240 -> "1,2k"
+const fmtK = n => { n = n||0; const a = Math.abs(n);
+  if (a < 0.005) return '0';
+  if (a >= 1000) return (n/1000).toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'k';
+  return n.toLocaleString('pt-BR',{maximumFractionDigits:0}); };
 const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const r2 = n => Math.round(n*100)/100;
@@ -495,6 +524,21 @@ function calc(){
   return { rec, desp, noMes, atraso, cotas, despCat, saldoAnt, saldo, ult, temIni: ini !== undefined && ini !== null };
 }
 
+// Saldo consolidado da conta: parte do saldo inicial do ano mais antigo
+// definido e soma todos os lancamentos daquele ano em diante.
+function calcGeral(){
+  const ini = D.saldoInicial || {};
+  const anos = Object.keys(ini).filter(a=>ini[a]!==undefined && ini[a]!==null && !isNaN(+a)).map(Number).sort((a,b)=>a-b);
+  if (!anos.length) return { ok:false, base:null, ignorados:0 };
+  const base = anos[0];
+  let s = +ini[base] || 0, ignorados = 0;
+  for (const l of D.lancamentos){
+    if (+String(l.data).slice(0,4) < base){ ignorados++; continue; }
+    s += (l.tipo === 'receita' ? l.valor : -l.valor);
+  }
+  return { ok:true, saldo:r2(s), base, ignorados };
+}
+
 // ---------- Render ----------
 function renderTudo(){
   $('#subtitulo').textContent = `Contas do condomínio · ${ANO}`;
@@ -540,8 +584,24 @@ function renderResumo(){
   $('#saldo').textContent = C.temIni ? fmt(C.saldo[idx]) : '—';
   $('#saldo-label').textContent = C.temIni ? `Saldo em ${MESES[idx]} ${ANO}` : `Saldo inicial de ${ANO} não definido`;
   $('#saldo-ini').textContent = C.temIni ? fmt((D.saldoInicial||{})[ANO]) : 'definir';
+
+  const G = calcGeral();
+  const bg = $('#saldo-geral');
+  bg.textContent = G.ok ? fmt(G.saldo) : '—';
+  bg.className = G.ok && G.saldo < 0 ? 'neg' : '';
+  bg.title = !G.ok ? 'Defina o saldo inicial de um ano para consolidar a conta'
+    : `Saldo consolidado desde ${G.base}` + (G.ignorados ? ` · ${G.ignorados} lançamento(s) anterior(es) a ${G.base} fora da conta` : '');
+
+  const kRec = C.rec[idx]||0, kDesp = C.desp[idx]||0, kRes = r2(kRec - kDesp), kAcum = C.saldo[idx];
+  $('#kpi-mes').textContent = C.ult >= 0 ? `Mês de referência: ${MESES[idx]}/${ANO}` : `Sem lançamentos em ${ANO}`;
+  $('#kpis').innerHTML = [
+    ['Receitas do mês', fmt(kRec), kRec ? 'pos' : 'off'],
+    ['Despesas do mês', fmt(kDesp), kDesp ? 'neg' : 'off'],
+    ['Resultado do mês', (kRes>0?'+':'')+fmt(kRes), kRes>0 ? 'pos' : (kRes<0 ? 'neg' : 'off')],
+    ['Saldo acumulado', C.temIni ? fmt(kAcum??0) : '—', !C.temIni ? 'off' : ((kAcum??0) < 0 ? 'neg' : '')],
+  ].map(([l,v,cl])=>`<div class="kpi"><span>${l}</span><b class="${cl}">${v}</b></div>`).join('');
   const max = Math.max(1,...C.rec,...C.desp);
-  $('#meses').innerHTML = MESES.map((m,i)=>`<div class="mes" title="${m}: receitas ${fmt(C.rec[i])} · despesas ${fmt(C.desp[i])}"><div class="bar"><i class="r" style="height:${C.rec[i]/max*100}%"></i><i class="d" style="height:${C.desp[i]/max*100}%"></i></div><label>${m}</label></div>`).join('');
+  $('#meses').innerHTML = MESES.map((m,i)=>`<div class="mes" title="${m}: receitas ${fmt(C.rec[i])} · despesas ${fmt(C.desp[i])}"><div class="vals"><b class="r${C.rec[i]?'':' zero'}">${fmtK(C.rec[i])}</b><b class="d${C.desp[i]?'':' zero'}">${fmtK(C.desp[i])}</b></div><div class="bar"><i class="r" style="height:${C.rec[i]/max*100}%"></i><i class="d" style="height:${C.desp[i]/max*100}%"></i></div><label>${m}</label></div>`).join('');
   const tot = a => a.reduce((s,v)=>s+(v||0),0);
   const linhas = [
     ['Saldo do mês anterior', C.saldoAnt.map(v=>v??0)],
