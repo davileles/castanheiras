@@ -116,6 +116,10 @@ td.edit{cursor:pointer;transition:background .15s} td.edit:hover{background:var(
 body.ro td.edit{cursor:default} body.ro td.edit:hover{background:inherit}
 td.pend{background:var(--desp-soft);color:var(--red)}
 td.pago{background:var(--rec-soft);color:var(--green)}
+.tag{display:inline-block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:3px 8px;border-radius:999px;white-space:nowrap}
+.tag.aberto{background:var(--desp-soft);color:var(--red)}
+.tag.menos{background:var(--warn-soft);color:var(--amber)}
+.tag.mais{background:var(--rec-soft);color:var(--green)}
 td.mes-atual{box-shadow:inset 0 2px 0 var(--accent)}
 /* Valor diferente da cota cadastrada: nem "pago" nem "pendente" contam essa
    historia sozinhos, entao a celula ganha contorno de atencao. */
@@ -552,12 +556,18 @@ const tdVals = (vals, cls) => vals.map(v=>{ v=v||0; return `<td class="${v===0?'
 // aqui, e nao enterrada numa celula colorida da grade de cotas.
 function divergencias(){
   const C = calc(), out = [];
+  const anoAtual = hoje.getFullYear();
   for(const m of D.moradores){
     const v = C.cotas[m.apto] || [];
+    const cota = m.valorCota || 0;
     MESES.forEach((mes,i)=>{
-      const pago = r2(v[i]||0); if(!pago) return;
-      const dif = r2(pago - (m.valorCota||0));
-      if(Math.abs(dif) >= 0.01) out.push({ apto:m.apto, nome:m.nome, mes, i, pago, cota:m.valorCota||0, dif });
+      const pago = r2(v[i]||0);
+      // mes ja vencido conta mesmo sem pagamento nenhum: a cota inteira esta em aberto.
+      // mes futuro so entra se houve algum pagamento com valor diferente da cota.
+      const vencido = ANO < anoAtual || (ANO === anoAtual && i <= hoje.getMonth());
+      if(!pago && !(vencido && cota > 0)) return;
+      const dif = r2(pago - cota);
+      if(Math.abs(dif) >= 0.01) out.push({ apto:m.apto, nome:m.nome, mes, i, pago, cota, dif, aberto: pago === 0 });
     });
   }
   return out.sort((a,b)=> a.i-b.i || ordCmp.compare(a.apto,b.apto));
@@ -568,14 +578,23 @@ function renderDivergencias(){
   $('#card-diverg').hidden = !L.length;
   if(!L.length) return;
   const soma = r2(L.reduce((s,x)=>s+x.dif,0));
-  $('#diverg-status').textContent = `${L.length} ${L.length===1?'mês':'meses'} fora do valor da cota · saldo ${soma>0?'+':''}${fmtN(soma)}`;
-  $('#tbl-diverg').innerHTML = `<thead><tr><th>Mês</th><th style="text-align:left">Apto</th><th>Cota</th><th>Pago</th><th>Diferença</th></tr></thead>
-  <tbody>${L.map(x=>`<tr>
+  const abertos = L.filter(x=>x.aberto), aMenos = L.filter(x=>!x.aberto && x.dif<0), aMais = L.filter(x=>!x.aberto && x.dif>0);
+  const emAberto = r2(abertos.reduce((s,x)=>s+x.cota,0));
+  const partes = [];
+  if(abertos.length) partes.push(`${abertos.length} sem pagamento (${fmtN(emAberto)} em aberto)`);
+  if(aMenos.length) partes.push(`${aMenos.length} pago a menos`);
+  if(aMais.length) partes.push(`${aMais.length} pago a mais`);
+  $('#diverg-status').textContent = `${partes.join(' · ')} · diferença total ${soma>0?'+':''}${fmtN(soma)}`;
+  $('#tbl-diverg').innerHTML = `<thead><tr><th>Mês</th><th style="text-align:left">Apto</th><th>Cota</th><th>Pago</th><th>Diferença</th><th>Situação</th></tr></thead>
+  <tbody>${L.map(x=>{
+    const tag = x.aberto ? ['aberto','Em aberto'] : (x.dif<0 ? ['menos','Pago a menos'] : ['mais','Pago a mais']);
+    return `<tr>
     <td>${esc(x.mes)}</td>
     <td style="text-align:left"><b>${esc(x.apto)}</b> <span class="status">${esc(x.nome)}</span></td>
-    <td>${fmtN(x.cota)}</td><td>${fmtN(x.pago)}</td>
+    <td>${fmtN(x.cota)}</td><td class="${x.aberto?'zero':''}">${x.aberto?'—':fmtN(x.pago)}</td>
     <td class="${x.dif<0?'desp':'rec'}">${x.dif>0?'+':'−'} ${fmtN(Math.abs(x.dif))}</td>
-  </tr>`).join('')}</tbody>`;
+    <td><span class="tag ${tag[0]}">${tag[1]}</span></td>
+  </tr>`;}).join('')}</tbody>`;
 }
 
 function renderResumo(){
