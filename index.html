@@ -113,6 +113,9 @@ body.ro td.edit{cursor:default} body.ro td.edit:hover{background:inherit}
 td.pend{background:var(--desp-soft);color:var(--red)}
 td.pago{background:var(--rec-soft);color:var(--green)}
 td.mes-atual{box-shadow:inset 0 2px 0 var(--accent)}
+/* Valor diferente da cota cadastrada: nem "pago" nem "pendente" contam essa
+   historia sozinhos, entao a celula ganha contorno de atencao. */
+td.dif{box-shadow:inset 0 0 0 1.5px var(--amber)}
 td.desc{text-align:left;white-space:normal;min-width:220px;max-width:360px;font-weight:500}
 td input[type=text]{width:100%;min-width:120px} td input.apto{min-width:60px;width:70px} td input[type=number]{width:100px}
 td.acao{text-align:center;width:auto;white-space:nowrap}
@@ -233,6 +236,10 @@ body.ro .edit-only{display:none!important}
       <h2>Receitas e despesas por mês</h2>
       <div class="meses" id="meses"></div>
       <div class="legend"><span><i class="r"></i>Receitas</span><span><i class="d"></i>Despesas</span></div>
+    </div>
+    <div class="card" id="card-diverg" hidden>
+      <h2>Divergências de cota <span class="status" id="diverg-status"></span></h2>
+      <div class="scroll"><table id="tbl-diverg"></table></div>
     </div>
     <div class="card">
       <h2>Demonstrativo financeiro <span class="status edit-only">Saldo inicial do ano: <a href="#" id="saldo-ini">definir</a></span></h2>
@@ -453,10 +460,41 @@ function calc(){
 // ---------- Render ----------
 function renderTudo(){
   $('#subtitulo').textContent = `Contas do condomínio · ${ANO}`;
-  renderResumo(); renderCotas(); renderDespesas(); renderLanc(); renderCadastros(); fillMesRef();
+  renderResumo(); renderDivergencias(); renderCotas(); renderDespesas(); renderLanc(); renderCadastros(); fillMesRef();
 }
 const thMeses = () => MESES.map((m,i)=>`<th class="${i===hoje.getMonth()&&ANO===hoje.getFullYear()?'mes-atual':''}">${m}</th>`).join('');
 const tdVals = (vals, cls) => vals.map(v=>{ v=v||0; return `<td class="${v===0?'zero':(cls||(v<0?'neg':''))}">${v===0?'—':fmtN(v)}</td>`; }).join('');
+
+// O valor lancado e sempre o que veio do extrato, nunca a cota do cadastro.
+// Quando os dois nao batem, a diferenca precisa aparecer em algum lugar — e
+// aqui, e nao enterrada numa celula colorida da grade de cotas.
+function divergencias(){
+  const C = calc(), out = [];
+  for(const m of D.moradores){
+    const v = C.cotas[m.apto] || [];
+    MESES.forEach((mes,i)=>{
+      const pago = r2(v[i]||0); if(!pago) return;
+      const dif = r2(pago - (m.valorCota||0));
+      if(Math.abs(dif) >= 0.01) out.push({ apto:m.apto, nome:m.nome, mes, i, pago, cota:m.valorCota||0, dif });
+    });
+  }
+  return out.sort((a,b)=> a.i-b.i || ordCmp.compare(a.apto,b.apto));
+}
+
+function renderDivergencias(){
+  const L = divergencias();
+  $('#card-diverg').hidden = !L.length;
+  if(!L.length) return;
+  const soma = r2(L.reduce((s,x)=>s+x.dif,0));
+  $('#diverg-status').textContent = `${L.length} ${L.length===1?'mês':'meses'} fora do valor da cota · saldo ${soma>0?'+':''}${fmtN(soma)}`;
+  $('#tbl-diverg').innerHTML = `<thead><tr><th>Mês</th><th style="text-align:left">Apto</th><th>Cota</th><th>Pago</th><th>Diferença</th></tr></thead>
+  <tbody>${L.map(x=>`<tr>
+    <td>${esc(x.mes)}</td>
+    <td style="text-align:left"><b>${esc(x.apto)}</b> <span class="status">${esc(x.nome)}</span></td>
+    <td>${fmtN(x.cota)}</td><td>${fmtN(x.pago)}</td>
+    <td class="${x.dif<0?'desp':'rec'}">${x.dif>0?'+':'−'} ${fmtN(Math.abs(x.dif))}</td>
+  </tr>`).join('')}</tbody>`;
+}
 
 function renderResumo(){
   const C = calc();
@@ -496,15 +534,18 @@ function renderCotas(){
     return `<tr><td><b>${esc(m.apto)}</b> <span class="status">${esc(m.nome)}</span></td>${MESES.map((mes,i)=>{
       const x=v[i]||0;
       const vencido = ANO<hoje.getFullYear() || (ANO===hoje.getFullYear() && i<=hoje.getMonth());
+      const dif = x>0 ? r2(x-(m.valorCota||0)) : 0;
       const cls = x>0 ? (x < m.valorCota-0.01 ? 'pend' : 'pago') : (vencido ? 'pend' : 'zero');
-      return `<td class="edit ${cls}" data-apto="${esc(m.apto)}" data-mes="${mes}" data-v="${x}">${x?fmtN(x):(vencido?'pendente':'—')}</td>`;}).join('')}<td><b>${fmtN(v.reduce((s,x)=>s+x,0))}</b></td></tr>`;}).join('')}</tbody>
+      const marca = Math.abs(dif)>=0.01 ? ' dif' : '';
+      const tit = x>0 ? ` title="Pago ${fmtN(x)} · cota ${fmtN(m.valorCota||0)}${Math.abs(dif)>=0.01?` · diferença ${dif>0?'+':'−'} ${fmtN(Math.abs(dif))}`:''}"` : '';
+      return `<td class="edit ${cls}${marca}" data-apto="${esc(m.apto)}" data-mes="${mes}" data-v="${x}"${tit}>${x?fmtN(x):(vencido?'pendente':'—')}</td>`;}).join('')}<td><b>${fmtN(v.reduce((s,x)=>s+x,0))}</b></td></tr>`;}).join('')}</tbody>
   <tfoot><tr><td>Total</td>${totalMes.map(v=>`<td>${v?fmtN(v):'—'}</td>`).join('')}<td>${fmtN(totalMes.reduce((s,v)=>s+v,0))}</td></tr></tfoot>`;
   $('#tbl-cotas').onclick = async e => {
     if(!CAN_WRITE) return;
     const td = e.target.closest('td.edit'); if(!td) return;
     const m = D.moradores.find(x=>x.apto===td.dataset.apto);
     const atual = Number(td.dataset.v)||0;
-    const s = prompt(`Cota do apto ${m.apto} referente a ${td.dataset.mes}/${ANO} — valor total (R$):`, fmtN(atual||m.valorCota)); if(s===null) return;
+    const s = prompt(`Cota do apto ${m.apto} referente a ${td.dataset.mes}/${ANO} — valor total pago, exatamente como no extrato (R$). Cota cadastrada: ${fmtN(m.valorCota||0)}.`, atual?fmtN(atual):''); if(s===null) return;
     const novo = parseBR(s), delta = r2(novo - atual); if(!delta) return;
     const dia = prompt('Data do pagamento (dd/mm/aaaa):', hojeBR()); if(dia===null) return;
     const data = parseData(dia); if(!data){ toast('Data inválida',true); return; }
@@ -654,7 +695,7 @@ async function lerArquivo(file){
   FONTE_DESC = '';
   const trans = /<OFX>|<STMTTRN>/i.test(txt) ? parseOFX(txt) : parseCSV(txt);
   if(!trans.length){ toast('Não encontrei transações no arquivo', true); return; }
-  IMP = trans.map(classificar);
+  IMP = alocarMesRef(trans.map(classificar));
   $('#imp-toolbar').hidden=false; $('#imp-card').hidden=false;
   renderImport();
 }
@@ -755,6 +796,33 @@ function classificar(t){
   }
   return l;
 }
+// Quando um apto paga duas vezes no mesmo mes, quase sempre e porque um mes
+// anterior ficou em aberto (foi o caso do 102 em marco, cobrindo fevereiro).
+// Somar os dois no mes do pagamento esconderia a pendencia, entao o segundo
+// credito e atribuido ao mes em aberto mais antigo do ano. O mes continua
+// editavel na propria linha — isto e um palpite, nao uma regra fechada.
+function alocarMesRef(lista){
+  if($('#imp-mesref').value) return lista;            // mes fixado na barra vence
+  const pago = {};                                     // pago[apto][ano][mes] = total
+  const marca = (apto, ano, i, v) => { ((pago[apto] ||= {})[ano] ||= Array(12).fill(0))[i] += v; };
+  for(const l of D.lancamentos){
+    if(!/receita/.test(l.tipo)) continue;
+    const i = mesIdx(l.mesRef); if(i < 0) continue;
+    marca(l.destino, +l.data.slice(0,4), i, l.valor);
+  }
+  for(const l of [...lista].sort((a,b)=>a.data.localeCompare(b.data))){
+    if(l.tipo!=='receita' || !l.destino || l.jaLancado) continue;
+    const ano = +l.data.slice(0,4), mp = mesIdx(l.mesPag);
+    const meses = (pago[l.destino]||{})[ano] || Array(12).fill(0);
+    if(meses[mp] > 0){
+      const aberto = meses.findIndex((v,i)=> i<mp && !v);
+      if(aberto >= 0){ l.mesRef = MESES[aberto]; l.motivo += ` · ${MESES[aberto]} em aberto`; }
+    }
+    marca(l.destino, ano, mesIdx(l.mesRef), l.valor);
+  }
+  return lista;
+}
+
 function renderImport(){
   if(!IMP.length) return;
   const optApto=v=>`<option value="">Escolher apto…</option>`+D.moradores.map(m=>`<option value="${esc(m.apto)}" ${m.apto===v?'selected':''}>${esc(m.apto)} · ${esc(m.nome)}</option>`).join('');
