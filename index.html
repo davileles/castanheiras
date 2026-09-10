@@ -155,6 +155,11 @@ td.mes-atual{box-shadow:inset 0 2px 0 var(--accent)}
    historia sozinhos, entao a celula ganha contorno de atencao. */
 td.dif{box-shadow:inset 0 0 0 1.5px var(--amber)}
 td.desc{text-align:left;white-space:normal;min-width:220px;max-width:360px;font-weight:500}
+/* Observacao e apoio, nao dado: fica em cinza para nao competir com a
+   descricao, e quebra linha porque costuma ser frase inteira. */
+td.obs{text-align:left;white-space:normal;min-width:150px;max-width:300px;font-weight:500;color:var(--muted);font-size:11.5px}
+td.obs.vazia{color:var(--muted2)}
+tr.editando td.obs input{font-size:12px}
 td input[type=text]{width:100%;min-width:120px} td input.apto{min-width:60px;width:70px} td input[type=number]{width:100px}
 td.acao{text-align:center;width:auto;white-space:nowrap}
 .ed,.ok{background:none;border:0;color:var(--muted2);font-size:14px;line-height:1;padding:4px 8px;border-radius:6px;transition:all .15s}
@@ -771,6 +776,7 @@ function rowLancLeitura(x){
     <td>${fmtData(x.data)}</td>
     <td class="desc">${esc(x.descricao)}</td>
     <td style="text-align:left">${/receita/.test(x.tipo)?`Apto ${esc(x.destino)} · ${esc(x.mesRef)}`:esc(x.destino)}</td>
+    <td class="obs${x.obs?'':' vazia'}">${x.obs?esc(x.obs):'—'}</td>
     <td class="${/receita/.test(x.tipo)?'rec':'desp'}">${/receita/.test(x.tipo)?'+':'−'} ${fmtN(x.valor)}</td>
     <td class="acao edit-only"><button class="ed" title="Editar">✎</button><button class="x" title="Excluir">×</button></td>
   </tr>`;
@@ -785,6 +791,7 @@ function rowLancEdicao(x){
       <select class="inline" data-e="destino"><option value="">Escolher…</option>${optDestino(x)}</select>
       ${rec?`<select class="inline" data-e="mesRef">${MESES.map(m=>`<option ${m===x.mesRef?'selected':''}>${m}</option>`).join('')}</select>`:''}
     </td>
+    <td class="obs"><input type="text" data-e="obs" value="${esc(x.obs||'')}" placeholder="Observação"></td>
     <td><input type="number" step="0.01" data-e="valor" value="${x.valor}"></td>
     <td class="acao edit-only"><button class="ok" title="Salvar">✓</button><button class="x" data-cancelar="1" title="Cancelar">×</button></td>
   </tr>`;
@@ -793,7 +800,7 @@ function renderLanc(){
   const L = doAno().slice().sort((a,b)=>b.data.localeCompare(a.data));
   $('#lanc-status').textContent = `${L.length} lançamentos`;
   if(!L.length){ $('#tbl-lanc').innerHTML = `<tr><td class="empty" style="text-align:center">Nenhum lançamento em ${ANO}.</td></tr>`; return; }
-  $('#tbl-lanc').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left">Descrição</th><th style="text-align:left">Destino</th><th>Valor</th><th class="edit-only"></th></tr></thead>
+  $('#tbl-lanc').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left">Descrição</th><th style="text-align:left">Destino</th><th style="text-align:left">Observação</th><th>Valor</th><th class="edit-only"></th></tr></thead>
   <tbody>${L.map(x => x.id===EDIT_ID ? rowLancEdicao(EDIT_BUF) : rowLancLeitura(x)).join('')}</tbody>`;
 
   // Rascunho acompanha cada tecla; trocar o tipo zera o destino, porque a
@@ -815,7 +822,7 @@ function renderLanc(){
       const b = EDIT_BUF;
       if(!b.data || !b.destino){ toast('Preencha data e destino', true); return; }
       if(!(b.valor > 0)){ toast('Valor deve ser maior que zero', true); return; }
-      const editado = { ...b, valor: r2(Math.abs(b.valor)), mesRef: /receita/.test(b.tipo) ? (b.mesRef || MESES[+b.data.slice(5,7)-1]) : MESES[+b.data.slice(5,7)-1] };
+      const editado = { ...b, obs: String(b.obs||'').trim(), valor: r2(Math.abs(b.valor)), mesRef: /receita/.test(b.tipo) ? (b.mesRef || MESES[+b.data.slice(5,7)-1]) : MESES[+b.data.slice(5,7)-1] };
       // Sai do modo de edicao ANTES de gravar: salvar() redesenha a tabela ao
       // final, e a linha voltaria a aparecer como formulario.
       EDIT_ID = null; EDIT_BUF = null;
@@ -865,10 +872,10 @@ function hojeBR(){ return hoje.toLocaleDateString('pt-BR'); }
 function parseBR(s){ s=String(s).replace(/R\$|\s/g,''); if(s.includes(',')) s=s.replace(/\./g,'').replace(',','.'); const n=parseFloat(s); return isNaN(n)?0:r2(n); }
 function parseData(s){ if(!s) return null; s=String(s).trim(); let m=s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})/); if(m) return `${m[3]}-${m[2]}-${m[1]}`; m=s.match(/^(\d{4})-(\d{2})-(\d{2})/); if(m) return `${m[1]}-${m[2]}-${m[3]}`; m=s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{2})$/); if(m) return `20${m[3]}-${m[2]}-${m[1]}`; return null; }
 function hash(s){ let h=0; for(const ch of s) h=(h*31+ch.charCodeAt(0))|0; return 'H'+(h>>>0).toString(36); }
-function lanc(data, descricao, valor, tipo, destino, mesRef){
+function lanc(data, descricao, valor, tipo, destino, mesRef, obs){
   // estornos são gravados como valores negativos do tipo base
   const neg = tipo.startsWith('estorno-'); const t = neg ? tipo.slice(8) : tipo;
-  return { id: hash(data+descricao+valor+tipo+Date.now()), data, descricao, valor: neg ? -valor : valor, tipo: t, destino, mesRef: mesRef||MESES[+data.slice(5,7)-1], origem:'manual' };
+  return { id: hash(data+descricao+valor+tipo+Date.now()), data, descricao, valor: neg ? -valor : valor, tipo: t, destino, mesRef: mesRef||MESES[+data.slice(5,7)-1], obs: obs||'', origem:'manual' };
 }
 
 // ---------- Reembolsos ----------
@@ -1077,7 +1084,8 @@ function abrirQuitacao(id){
         if(alvo.status === 'quitado') throw new Error('Esta pendência já foi restituída em outra aba');
         let lid = linkId;
         if(!lid){
-          const nl = lanc(dataQ, desc, valor, 'despesa', cat, MESES[+dataQ.slice(5,7)-1]);
+          const nl = lanc(dataQ, desc, valor, 'despesa', cat, MESES[+dataQ.slice(5,7)-1],
+            `Restituição de pagamento feito por fora em ${fmtData(r.data)}`);
           nl.origem = 'reembolso'; nl.reembolsoId = id;
           d.lancamentos.push(nl);
           lid = nl.id;
