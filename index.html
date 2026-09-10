@@ -218,6 +218,20 @@ tr.off td{opacity:.45}
 .rec-chk{margin-right:9px;vertical-align:-2px}
 .rec-mark{color:var(--accent);font-weight:800;margin-right:6px}
 #tbl-despesas th.col-tot,#tbl-despesas td.col-tot{border-left:1px solid var(--border-ctrl)}
+/* ══ ANALISE ══
+   Ocasional empilhada sobre a recorrente com listra horizontal — padrao
+   diferente da listra diagonal do "previsto" do Resumo, para nao confundir. */
+.mes .bar{position:relative}
+.mes .bar i.d.ocas{background:linear-gradient(to bottom,transparent var(--p),var(--desp) var(--p)),repeating-linear-gradient(0deg,color-mix(in srgb,var(--desp) 75%,transparent) 0 2px,color-mix(in srgb,var(--desp) 22%,transparent) 2px 5px)}
+.mes .bar s.ref{position:absolute;left:-4px;right:-4px;height:0;border-top:1.5px dashed var(--text);opacity:.6;pointer-events:none}
+.mes label em{display:block;font-style:normal;font-size:8px;color:var(--muted2);letter-spacing:0}
+.legend .o{background:repeating-linear-gradient(0deg,var(--desp) 0 2px,transparent 2px 4px)}
+.legend i.ref{width:16px;height:0;border-radius:0;border-top:1.5px dashed var(--text);opacity:.6;vertical-align:3px}
+.veredito{padding:15px 18px;font-size:13px;font-weight:600;line-height:1.7}
+.veredito .tag{margin-right:9px;vertical-align:1px}
+#anal-kpis2{margin-top:-8px}
+#anal-margem{width:auto;margin-left:6px}
+#tbl-anal-hist td:first-child,#tbl-anal-cat td:first-child,#tbl-anal-top td:first-child{font-weight:700}
 
 /* ══ IMPORTACAO ══ */
 .drop{border:1.5px dashed var(--border-ctrl);border-radius:14px;padding:32px;text-align:center;background:var(--surface);color:var(--muted);display:block;font-size:12.5px;font-weight:600;transition:all .15s}
@@ -308,6 +322,7 @@ td.check{text-align:center;width:80px}
         <button role="tab" data-tab="despesas">Despesas</button>
         <button role="tab" data-tab="reembolsos">Reembolsos <span class="badge" id="badge-reemb" hidden></span></button>
         <button role="tab" data-tab="lancamentos">Lançamentos</button>
+        <button role="tab" data-tab="analise" class="admin-only">Análise</button>
         <button role="tab" data-tab="importar" class="edit-only">Importar extrato</button>
         <button role="tab" data-tab="cadastros" class="edit-only">Moradores e regras</button>
         <button role="tab" data-tab="config" class="admin-only">Configuração</button>
@@ -346,7 +361,7 @@ td.check{text-align:center;width:80px}
         <div class="kpi-cap" id="prev-cap"></div>
         <div class="kpis prev" id="kpis-prev"></div>
       </div>
-      <div class="legend"><span><i class="r"></i>Receitas</span><span><i class="d"></i>Despesas</span><span id="leg-prev" hidden><i class="p"></i>Previsto — cotas a receber, recorrentes e média das ocasionais</span></div>
+      <div class="legend"><span><i class="r"></i>Receitas</span><span><i class="d"></i>Despesas</span><span id="leg-prev" hidden><i class="p"></i>Previsto — cotas a receber e despesas recorrentes</span></div>
     </div>
     <div class="card" id="card-prev" hidden>
       <h2>Previsão dos próximos meses <span class="status" id="prev-status"></span></h2>
@@ -450,6 +465,34 @@ td.check{text-align:center;width:80px}
       <button class="f" data-f="lancados">Já lançados</button>
     </div>
     <div class="card" id="imp-card" hidden><div class="scroll"><table id="tbl-import"></table></div></div>
+  </section>
+
+  <section id="tab-analise" class="admin-only" hidden>
+    <div class="card" id="anal-vazio" hidden><div class="empty">Sem cotas cadastradas ou sem lançamentos suficientes para a análise.</div></div>
+    <div id="anal-conteudo">
+      <div class="card">
+        <h2>A cota cobre as despesas do condomínio? <span class="status" id="anal-status"></span></h2>
+        <div class="veredito" id="anal-veredito"></div>
+        <div class="kpis" id="anal-kpis"></div>
+        <div class="kpis" id="anal-kpis2"></div>
+        <div class="meses" id="anal-meses"></div>
+        <div class="legend"><span><i class="r"></i>Receita real</span><span><i class="d"></i>Recorrentes</span><span><i class="o"></i>Ocasionais</span><span><i class="ref"></i>Cotas cadastradas</span></div>
+        <div class="scroll prev-sep"><table id="tbl-anal-hist"></table></div>
+      </div>
+      <div class="card">
+        <h2>Reajuste da cota <span class="h2-dir"><label class="status">Margem de segurança <select id="anal-margem" class="inline">
+          <option value="0">0% — só empatar</option><option value="5">5%</option><option value="10">10%</option><option value="15">15%</option><option value="20">20%</option>
+        </select></label></span></h2>
+        <div class="veredito" id="anal-reaj-texto"></div>
+        <div class="scroll"><table id="tbl-anal-reaj"></table></div>
+        <div class="result status" id="anal-reaj-nota"></div>
+      </div>
+      <div class="card">
+        <h2>O que pesou nos ocasionais</h2>
+        <div class="scroll"><table id="tbl-anal-cat"></table></div>
+        <div class="scroll prev-sep"><table id="tbl-anal-top"></table></div>
+      </div>
+    </div>
   </section>
 
   <section id="tab-config" class="admin-only" hidden>
@@ -698,8 +741,10 @@ function calcGeral(){
 // pela metade). Mês sem pagamento conta como zero: conta bimestral não é
 // prevista em dobro.
 // Ocasional = todo o resto (categorias não marcadas e débitos sem categoria).
-// Não dá para prever qual vai acontecer, então entra como reserva: tudo o que
-// foi gasto com ocasionais nos 12 meses, dividido por 12.
+// Não dá para prever qual vai acontecer nem quando, então a ocasional NÃO entra
+// na previsão do mês — misturar uma média com o caixa real do mês falsearia o
+// número. Ela vai para a aba Análise, que responde outra pergunta: a cota
+// atual cobre o custo do condomínio ao longo do ano?
 // Receita prevista = cotas cadastradas. Tudo é relativo a hoje, não ao ano
 // escolhido no seletor.
 const PREV_JANELA = 12, PREV_HORIZONTE = 6;
@@ -709,15 +754,16 @@ function calcPrevisao(){
   const anoH = hoje.getFullYear(), mesH = hoje.getMonth(), kH = kMes(anoH, mesH), diaH = hoje.getDate();
   const marcadas = new Set((D.recorrentes||[]).filter(c => D.categorias.includes(c)));
   let kMin = Infinity, ultimo = '';
-  const porCat = {}, dias = {}, ocasPorMes = {};
+  const porCat = {}, dias = {}, ocasPorMes = {}, recPorMes = {}, recorrPorMes = {}, ocasLanc = [];
   for (const l of D.lancamentos){
     const k = kMes(+l.data.slice(0,4), +l.data.slice(5,7)-1);
     if (k < kMin) kMin = k;
     if (l.data > ultimo) ultimo = l.data;
-    if (l.tipo === 'receita') continue;
+    if (l.tipo === 'receita'){ recPorMes[k] = (recPorMes[k]||0) + l.valor; continue; }
     const v = (porCat[l.destino] = porCat[l.destino] || {});
     v[k] = (v[k]||0) + l.valor;
-    if (!marcadas.has(l.destino)) ocasPorMes[k] = (ocasPorMes[k]||0) + l.valor;
+    if (marcadas.has(l.destino)) recorrPorMes[k] = (recorrPorMes[k]||0) + l.valor;
+    else { ocasPorMes[k] = (ocasPorMes[k]||0) + l.valor; ocasLanc.push({ ...l, k }); }
     if (k >= kH-PREV_JANELA && k < kH && l.valor > 0) (dias[l.destino] = dias[l.destino] || []).push(+l.data.slice(8,10));
   }
   // Antes do primeiro lançamento não existe histórico: a média divide só pelos
@@ -764,28 +810,45 @@ function calcPrevisao(){
     if (x > 0.005) ocasFreq++;
     if (x > ocasPior){ ocasPior = x; ocasPiorK = k; }
   }
-  const ocasMedia = r2(ocasSoma / nMeses), ocasPagoMes = r2(ocasPorMes[kH]||0);
-  // No mês corrente a reserva é o que ainda cabe dentro da média: se já saiu
-  // mais que a média em ocasionais, não se provisiona nada a mais.
-  const ocasPendMes = r2(Math.max(0, ocasMedia - ocasPagoMes));
+  const ocasMedia = r2(ocasSoma / nMeses);
   const restituir = r2(rbLista().filter(rbAberto).reduce((s,r)=>s+(+r.valor||0),0));
   const G = calcGeral();
+  // Projeção de caixa: só o que tem data e valor esperados (cotas, recorrentes
+  // e restituições já combinadas).
   const meses = [];
   let saldo = G.ok ? G.saldo : null;
   for (let j = 0; j < PREV_HORIZONTE; j++){
     const k = kH + j;
     const receber = j === 0 ? cotasPendMes : cotaTotal;
     const recorr = j === 0 ? despPendMes : despMensal;
-    const ocas = j === 0 ? ocasPendMes : ocasMedia;
     const rest = j === 0 ? restituir : 0;
-    const pagar = r2(recorr + ocas + rest);
+    const pagar = r2(recorr + rest);
     const res = r2(receber - pagar);
     if (saldo !== null) saldo = r2(saldo + res);
-    meses.push({ k, a: Math.floor(k/12), m: k%12, receber, recorr, ocas, rest, pagar, res, saldo });
+    meses.push({ k, a: Math.floor(k/12), m: k%12, receber, recorr, rest, pagar, res, saldo });
   }
+  // Análise: histórico mês a mês da janela, ocasionais por categoria e as maiores.
+  const hist = [];
+  let recSoma = 0;
+  for (let k = kIni; k < kH; k++){
+    const receita = r2(recPorMes[k]||0), recorr = r2(recorrPorMes[k]||0), ocas = r2(ocasPorMes[k]||0);
+    recSoma += receita;
+    hist.push({ k, receita, recorr, ocas, res: r2(receita - recorr - ocas) });
+  }
+  const noPeriodo = ocasLanc.filter(l => l.k >= kIni && l.k < kH);
+  const porCatOcas = {};
+  for (const l of noPeriodo){
+    const nome = D.categorias.includes(l.destino) ? l.destino : 'Sem categoria';
+    const o = (porCatOcas[nome] = porCatOcas[nome] || { cat: nome, total: 0, meses: new Set() });
+    o.total += l.valor; if (l.valor > 0) o.meses.add(l.k);
+  }
+  const ocasPorCat = Object.values(porCatOcas).map(o => ({ cat: o.cat, total: r2(o.total), media: r2(o.total / nMeses), meses: o.meses.size }))
+    .filter(o => Math.abs(o.total) > 0.005).sort((a,b) => b.total - a.total);
+  const ocasTop = noPeriodo.filter(l => l.valor > 0).sort((a,b) => b.valor - a.valor).slice(0, 6);
   return { anoH, mesH, kH, kIni, nMeses, janela: `${rotMes(kIni)} a ${rotMes(kH-1)}`, cats, recs,
     cotaTotal, cotasPendMes, cotasAtraso: r2(cotasAtraso), despMensal, despPendMes, restituir,
-    ocasMedia, ocasPagoMes, ocasPendMes, ocasFreq, ocasPior: r2(ocasPior), ocasPiorK,
+    ocasMedia, ocasFreq, ocasPior: r2(ocasPior), ocasPiorK, ocasPorCat, ocasTop,
+    hist, recMediaReal: r2(recSoma / nMeses),
     meses, saldoAtual: G.ok ? G.saldo : null, ultimo };
 }
 
@@ -804,63 +867,145 @@ function renderPrevisao(P){
   $('#prev-cap').textContent = `Previsão para ${mesNome} · o que ainda falta entrar e sair`;
   const nPend = P.recs.filter(x=>x.pendente).length;
   const partes = [];
-  partes.push(semRec ? dicaRec : (nPend ? `${fmt(m0.recorr)} de ${nPend} recorrente${nPend>1?'s':''}` : 'recorrentes já pagas'));
-  if (m0.ocas) partes.push(`${fmt(m0.ocas)} de reserva p/ ocasionais`);
+  partes.push(semRec ? dicaRec : (nPend ? `${nPend} recorrente${nPend>1?'s':''} ainda não paga${nPend>1?'s':''}` : 'recorrentes do mês já pagas'));
   if (m0.rest) partes.push(`${fmt(m0.rest)} a restituir`);
   $('#kpis-prev').innerHTML = [
     ['Cotas a receber', fmt(m0.receber), m0.receber ? 'pos' : 'off', m0.receber ? `de ${fmt(P.cotaTotal)} previstos no mês` : 'todas as cotas do mês entraram'],
-    ['A pagar até o fim do mês', fmt(m0.pagar), m0.pagar ? 'neg' : 'off', partes.join(' · ')],
+    ['A pagar até o fim do mês', semRec && !m0.rest ? '—' : fmt(m0.pagar), m0.pagar ? 'neg' : 'off', partes.join(' · ')],
     ['Resultado previsto do mês', (resPrev>0?'+':'')+fmt(resPrev), resPrev>0 ? 'pos' : (resPrev<0 ? 'neg' : 'off'), 'realizado + pendências'],
     ['Saldo previsto no fim do mês', m0.saldo !== null ? fmt(m0.saldo) : '—', m0.saldo === null ? 'off' : (m0.saldo < 0 ? 'neg' : ''), P.saldoAtual !== null ? `hoje ${fmt(P.saldoAtual)}` : 'defina o saldo inicial'],
   ].map(([l,v,cl,sub])=>`<div class="kpi"><span>${l}</span><b class="${cl}">${v}</b><small>${esc(sub)}</small></div>`).join('');
 
   // Projeção
-  $('#prev-status').textContent = `média de ${P.janela}` + (P.ultimo ? ` · extrato até ${fmtData(P.ultimo)}` : '');
+  $('#prev-status').textContent = `recorrentes pela média de ${P.janela}` + (P.ultimo ? ` · extrato até ${fmtData(P.ultimo)}` : '');
   const tot = (k) => r2(P.meses.reduce((s,x)=>s+x[k],0));
   const cls = v => v < 0 ? 'neg' : '';
   const cel = (v, cl) => `<td class="${v?cl:'zero'}">${v?fmtN(v):'—'}</td>`;
   const temRest = P.meses.some(x=>x.rest);
-  $('#tbl-prev').innerHTML = `<thead><tr><th>Mês</th><th>A receber (cotas)</th><th>Recorrentes</th><th title="Média mensal de ${P.janela} de tudo que não é recorrente">Ocasionais (média)</th>${temRest?'<th>Restituições</th>':''}<th>Resultado previsto</th><th>Saldo previsto</th></tr></thead>
+  $('#tbl-prev').innerHTML = `<thead><tr><th>Mês</th><th>A receber (cotas)</th><th>A pagar (recorrentes)</th>${temRest?'<th>Restituições</th>':''}<th>Resultado previsto</th><th>Saldo previsto</th></tr></thead>
   <tbody>${P.meses.map((x,j)=>`<tr class="${j===0?'atual':''}">
     <td>${rotMes(x.k)}${j===0?' <span class="status">restante</span>':''}</td>
-    ${cel(x.receber,'rec')}${cel(x.recorr,'desp')}${cel(x.ocas,'desp')}${temRest?cel(x.rest,'desp'):''}
+    ${cel(x.receber,'rec')}${cel(x.recorr,'desp')}${temRest?cel(x.rest,'desp'):''}
     <td class="${x.res?cls(x.res):'zero'}">${x.res?(x.res>0?'+':'')+fmtN(x.res):'—'}</td>
     <td class="${x.saldo===null?'zero':cls(x.saldo)}"><b>${x.saldo===null?'—':fmtN(x.saldo)}</b></td>
   </tr>`).join('')}</tbody>
-  <tfoot><tr><td>${PREV_HORIZONTE} meses</td><td>${fmtN(tot('receber'))}</td><td>${fmtN(tot('recorr'))}</td><td>${fmtN(tot('ocas'))}</td>${temRest?`<td>${fmtN(tot('rest'))}</td>`:''}<td>${(tot('res')>0?'+':'')+fmtN(tot('res'))}</td><td></td></tr></tfoot>`;
+  <tfoot><tr><td>${PREV_HORIZONTE} meses</td><td>${fmtN(tot('receber'))}</td><td>${fmtN(tot('recorr'))}</td>${temRest?`<td>${fmtN(tot('rest'))}</td>`:''}<td>${(tot('res')>0?'+':'')+fmtN(tot('res'))}</td><td></td></tr></tfoot>`;
 
   // Recorrentes do mês corrente
-  if(semRec && !P.restituir && !P.ocasMedia){
+  if(semRec && !P.restituir){
     $('#tbl-prev-rec').innerHTML = `<tbody><tr><td class="empty" style="position:static">Nenhuma despesa recorrente marcada — ${CAN_WRITE ? 'marque na aba <a href="#" data-ir="despesas">Despesas</a> as contas que se repetem todo mês (água, luz, conservadora…) para elas entrarem na previsão.' : 'a previsão considera só as cotas.'}</td></tr></tbody>`;
   } else {
     const situ = x => !x.pendente ? (x.pagoMes > 0 ? '<span class="tag quit">Paga</span>' : '<span class="tag">Sem previsão</span>')
       : x.passou ? `<span class="tag aberto">Passou do dia ${x.dia}</span>` : `<span class="tag pend">${x.dia ? `Costuma sair dia ${x.dia}` : 'Pendente'}</span>`;
-    const somaMed = r2(P.despMensal + P.ocasMedia), somaPago = r2(P.recs.reduce((s,x)=>s+Math.max(0,x.pagoMes),0) + Math.max(0,P.ocasPagoMes));
-    const ocasSitu = P.ocasPagoMes > P.ocasMedia + 0.005 ? '<span class="tag aberto">Acima da média</span>'
-      : P.ocasPendMes ? '<span class="tag pend">Reserva</span>' : '<span class="tag quit">Dentro da média</span>';
-    const ocasTit = `Houve gasto ocasional em ${P.ocasFreq} de ${P.nMeses} meses` + (P.ocasPiorK !== null ? ` · pior mês ${rotMes(P.ocasPiorK)}: ${fmt(P.ocasPior)}` : '');
-    $('#tbl-prev-rec').innerHTML = `<thead><tr><th>Despesas de ${mesNome}</th><th>Média ${P.nMeses}m</th><th>Pago no mês</th><th>Pendente</th><th>Situação</th></tr></thead>
+    const somaMed = P.despMensal, somaPago = r2(P.recs.reduce((s,x)=>s+Math.max(0,x.pagoMes),0));
+    $('#tbl-prev-rec').innerHTML = `<thead><tr><th>Recorrentes de ${mesNome}</th><th>Média ${P.nMeses}m</th><th>Pago no mês</th><th>Pendente</th><th>Situação</th></tr></thead>
     <tbody>${P.recs.map(x=>`<tr>
       <td>${esc(x.cat)}</td>
       <td class="${x.media?'':'zero'}" title="Pago em ${x.freq} de ${P.nMeses} meses">${x.media?fmtN(x.media):'—'}</td>
       <td class="${x.pagoMes>0?'':'zero'}">${x.pagoMes>0?fmtN(x.pagoMes):'—'}</td>
       <td class="${x.pendente?'desp':'zero'}">${x.pendente?fmtN(x.pendente):'—'}</td>
       <td>${situ(x)}</td>
-    </tr>`).join('')}${P.ocasMedia || P.ocasPagoMes ? `<tr>
-      <td>Ocasionais <span class="status">reserva</span></td>
-      <td class="${P.ocasMedia?'':'zero'}" title="${ocasTit}">${P.ocasMedia?fmtN(P.ocasMedia):'—'}</td>
-      <td class="${P.ocasPagoMes>0?'':'zero'}">${P.ocasPagoMes>0?fmtN(P.ocasPagoMes):'—'}</td>
-      <td class="${P.ocasPendMes?'desp':'zero'}">${P.ocasPendMes?fmtN(P.ocasPendMes):'—'}</td>
-      <td>${ocasSitu}</td>
-    </tr>` : ''}${P.restituir ? `<tr><td>Restituições em aberto</td><td class="zero">—</td><td class="zero">—</td><td class="desp">${fmtN(P.restituir)}</td><td><span class="tag pend">A restituir</span></td></tr>` : ''}</tbody>
+    </tr>`).join('')}${P.restituir ? `<tr><td>Restituições em aberto</td><td class="zero">—</td><td class="zero">—</td><td class="desp">${fmtN(P.restituir)}</td><td><span class="tag pend">A restituir</span></td></tr>` : ''}</tbody>
     <tfoot><tr><td>Total</td><td>${fmtN(somaMed)}</td><td>${fmtN(somaPago)}</td><td>${fmtN(m0.pagar)}</td><td></td></tr></tfoot>`;
   }
-  $('#prev-nota').innerHTML = `Previsão = cotas cadastradas (${fmt(P.cotaTotal)}/mês) − média de ${P.janela} das recorrentes (${fmt(P.despMensal)}/mês) − média das ocasionais (${fmt(P.ocasMedia)}/mês).`
-    + (P.ocasMedia ? ` <b>Para ocasionais, reserve em caixa ao menos ${fmt(P.ocasMedia)} por mês</b>${P.ocasPiorK !== null ? ` — no pior mês (${rotMes(P.ocasPiorK)}) foram ${fmt(P.ocasPior)}` : ''}.` : '')
-    + (semRec ? ` Nenhuma despesa está marcada como recorrente, então todas contam como ocasionais.` : '')
-    + (P.cotasAtraso ? ` Cotas de meses anteriores em aberto (${fmt(P.cotasAtraso)}) ficam fora.` : '')
+  $('#prev-nota').innerHTML = `Previsão = cotas cadastradas (${fmt(P.cotaTotal)}/mês) − média de ${P.janela} das recorrentes (${fmt(P.despMensal)}/mês).`
+    + ` Despesas ocasionais não entram: não têm data nem valor certos${IS_ADMIN ? ` — o peso delas no ano está na aba <a href="#" data-ir="analise">Análise</a>` : ''}.`
+    + (P.cotasAtraso ? ` Cotas de meses anteriores em aberto (${fmt(P.cotasAtraso)}) também ficam fora.` : '')
     + ` As pendências de ${mesNome} dependem do extrato estar importado.`;
 }
+
+// ---------- Análise: a cota cobre o condomínio? ----------
+// Olha para o ano, não para o mês: soma recorrentes e ocasionais pela média da
+// janela e compara com o que as cotas arrecadam. É daqui que sai a conversa
+// sobre reajuste — por isso fica fora do Resumo, que é o espelho do caixa.
+let ANAL_MARGEM = 10;
+const pct = (v, d=1) => (v*100).toLocaleString('pt-BR',{minimumFractionDigits:d,maximumFractionDigits:d}) + '%';
+function renderAnalise(){
+  if(!IS_ADMIN) return;
+  const P = calcPrevisao();
+  const vazio = !P.cotaTotal || !P.hist.some(h => h.receita || h.recorr || h.ocas);
+  $('#anal-conteudo').hidden = vazio;
+  $('#anal-vazio').hidden = !vazio;
+  if (vazio) return;
+  const despMedia = r2(P.despMensal + P.ocasMedia);
+  const sobra = r2(P.cotaTotal - despMedia), margem = sobra / P.cotaTotal;
+  const taxa = P.recMediaReal / P.cotaTotal, taxaUso = taxa > 0 ? Math.min(1, taxa) : 1;
+  const sobraReal = r2(P.recMediaReal - despMedia);
+  const [tagCl, tagTx] = sobra < 0 ? ['aberto','Não cobre'] : margem < 0.05 ? ['pend','No limite'] : ['quit','Cobre com folga'];
+  $('#anal-status').textContent = `média de ${P.janela}`;
+  $('#anal-veredito').innerHTML = `<span class="tag ${tagCl}">${tagTx}</span>`
+    + (sobra < 0
+      ? `Na média de ${P.janela}, as despesas (${fmt(despMedia)}/mês) passam das cotas cadastradas (${fmt(P.cotaTotal)}/mês) em <b>${fmt(-sobra)} por mês</b>.`
+      : `Depois de pagar recorrentes e ocasionais, sobram <b>${fmt(sobra)} por mês</b> (${pct(margem)} das cotas)` + (margem < 0.05 ? ' — pouco para formar reserva.' : '.'))
+    + ` Com o que de fato entrou (${pct(taxa)} das cotas), ${sobraReal >= 0 ? 'sobram' : 'faltam'} ${fmt(Math.abs(sobraReal))} por mês.`;
+
+  const k = (l, v, cl, sub) => `<div class="kpi"><span>${l}</span><b class="${cl}">${v}</b><small>${esc(sub)}</small></div>`;
+  const mesesSaldo = P.saldoAtual !== null && despMedia ? P.saldoAtual / despMedia : null;
+  $('#anal-kpis').innerHTML = [
+    k('Cotas cadastradas', fmt(P.cotaTotal), 'pos', 'por mês'),
+    k('Recorrentes', fmt(P.despMensal), 'neg', 'média mensal'),
+    k('Ocasionais', fmt(P.ocasMedia), 'neg', `gasto em ${P.ocasFreq} de ${P.nMeses} meses`),
+    k('Sobra estrutural', (sobra>0?'+':'')+fmt(sobra), sobra<0?'neg':(sobra>0?'pos':'off'), `${pct(margem)} das cotas`),
+  ].join('');
+  $('#anal-kpis2').innerHTML = [
+    k('Arrecadação real', fmt(P.recMediaReal), 'pos', `média mensal · ${pct(taxa)} do cadastrado`),
+    k('Sobra com arrecadação real', (sobraReal>0?'+':'')+fmt(sobraReal), sobraReal<0?'neg':(sobraReal>0?'pos':'off'), 'receita real − recorrentes − ocasionais'),
+    k('Pior mês de ocasionais', P.ocasPiorK !== null ? fmt(P.ocasPior) : '—', P.ocasPiorK !== null ? 'neg' : 'off', P.ocasPiorK !== null ? rotMes(P.ocasPiorK) : 'sem ocasionais no período'),
+    k('Saldo em meses de despesa', mesesSaldo === null ? '—' : mesesSaldo.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1}) + (mesesSaldo >= 1.95 ? ' meses' : ' mês'), mesesSaldo !== null && mesesSaldo < 1 ? 'neg' : '', P.saldoAtual !== null ? `saldo ${fmt(P.saldoAtual)} ÷ ${fmt(despMedia)}` : 'defina o saldo inicial'),
+  ].join('');
+
+  // Gráfico: receita x despesa empilhada (recorrente embaixo, ocasional em cima)
+  // e a linha tracejada das cotas cadastradas.
+  const max = Math.max(1, P.cotaTotal, ...P.hist.map(h => Math.max(h.receita, h.recorr + h.ocas)));
+  const ref = P.cotaTotal / max * 100;
+  $('#anal-meses').innerHTML = P.hist.map(h => {
+    const desp = Math.max(0, h.recorr) + Math.max(0, h.ocas);
+    const p = desp ? Math.max(0, h.ocas) / desp * 100 : 0;
+    const tit = `${rotMes(h.k)}: receita ${fmt(h.receita)} · recorrentes ${fmt(h.recorr)} · ocasionais ${fmt(h.ocas)} · resultado ${fmt(h.res)}`;
+    return `<div class="mes" title="${tit}"><div class="vals"><b class="r${h.receita?'':' zero'}">${fmtK(h.receita)}</b><b class="d${desp?'':' zero'}">${fmtK(desp)}</b></div><div class="bar"><i class="r" style="height:${Math.max(0,h.receita)/max*100}%"></i><i class="d${h.ocas>0?' ocas':''}" style="height:${desp/max*100}%;--p:${p}%"></i><s class="ref" style="bottom:${ref}%"></s></div><label>${MESES[h.k%12]}<em>${String(Math.floor(h.k/12)).slice(2)}</em></label></div>`;
+  }).join('');
+  const cls = v => v < 0 ? 'neg' : (v > 0 ? 'rec' : 'zero');
+  $('#tbl-anal-hist').innerHTML = `<thead><tr><th>Mês</th><th>Receita real</th><th>Recorrentes</th><th>Ocasionais</th><th>Resultado</th></tr></thead>
+  <tbody>${P.hist.map(h=>`<tr><td>${rotMes(h.k)}</td><td class="${h.receita?'rec':'zero'}">${h.receita?fmtN(h.receita):'—'}</td><td class="${h.recorr?'desp':'zero'}">${h.recorr?fmtN(h.recorr):'—'}</td><td class="${h.ocas?'desp':'zero'}">${h.ocas?fmtN(h.ocas):'—'}</td><td class="${cls(h.res)}">${h.res?(h.res>0?'+':'')+fmtN(h.res):'—'}</td></tr>`).join('')}</tbody>
+  <tfoot><tr><td>Média</td><td>${fmtN(P.recMediaReal)}</td><td>${fmtN(P.despMensal)}</td><td>${fmtN(P.ocasMedia)}</td><td>${(sobraReal>0?'+':'')+fmtN(sobraReal)}</td></tr></tfoot>`;
+
+  // Reajuste
+  const m = ANAL_MARGEM / 100;
+  const necessario = r2(despMedia * (1 + m) / taxaUso);
+  const reaj = necessario / P.cotaTotal - 1;
+  $('#anal-margem').value = String(ANAL_MARGEM);
+  $('#anal-reaj-texto').innerHTML = `Para pagar a média de despesas (${fmt(despMedia)}/mês)${m ? ` com ${ANAL_MARGEM}% de margem para formar reserva` : ''}`
+    + (taxaUso < 1 ? `, considerando que só ${pct(taxaUso)} das cotas entraram de fato,` : '')
+    + ` as cotas cadastradas precisam somar <b>${fmt(necessario)} por mês</b>.`
+    + (reaj > 0.0005 ? ` Hoje somam ${fmt(P.cotaTotal)}: reajuste de <b>${pct(reaj)}</b>.` : ` Hoje somam ${fmt(P.cotaTotal)} — não há reajuste necessário com essa margem.`);
+  const aptos = D.moradores.filter(x => (+x.valorCota||0) > 0);
+  if (reaj > 0.0005 && aptos.length){
+    const linhas = aptos.map(x => { const atual = +x.valorCota; const sug = Math.ceil(atual * (1 + reaj) / 5) * 5; return { x, atual, sug, dif: r2(sug - atual) }; });
+    const tA = r2(linhas.reduce((s,l)=>s+l.atual,0)), tS = r2(linhas.reduce((s,l)=>s+l.sug,0));
+    $('#tbl-anal-reaj').innerHTML = `<thead><tr><th>Apto</th><th style="text-align:left">Morador</th><th>Cota atual</th><th>Cota sugerida</th><th>Diferença</th></tr></thead>
+    <tbody>${linhas.map(l=>`<tr><td>${esc(l.x.apto)}</td><td style="text-align:left">${esc(l.x.nome)}</td><td>${fmtN(l.atual)}</td><td><b>${fmtN(l.sug)}</b></td><td class="desp">+${fmtN(l.dif)}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td colspan="2">Total</td><td>${fmtN(tA)}</td><td>${fmtN(tS)}</td><td>+${fmtN(r2(tS-tA))} (${pct(tS/tA-1)})</td></tr></tfoot>`;
+    $('#anal-reaj-nota').textContent = 'Mantém a proporção atual entre os apartamentos e arredonda cada cota para cima em múltiplos de R$ 5.';
+    $('#tbl-anal-reaj').parentElement.hidden = false;
+  } else {
+    $('#tbl-anal-reaj').innerHTML = ''; $('#tbl-anal-reaj').parentElement.hidden = true;
+    $('#anal-reaj-nota').textContent = '';
+  }
+
+  // Ocasionais
+  const totOcas = r2(P.ocasPorCat.reduce((s,o)=>s+o.total,0));
+  $('#tbl-anal-cat').innerHTML = P.ocasPorCat.length
+    ? `<thead><tr><th>Ocasionais por categoria</th><th>Total no período</th><th>Média/mês</th><th>Meses com gasto</th><th>Participação</th></tr></thead>
+    <tbody>${P.ocasPorCat.map(o=>`<tr><td>${esc(o.cat)}</td><td class="desp">${fmtN(o.total)}</td><td>${fmtN(o.media)}</td><td>${o.meses} de ${P.nMeses}</td><td>${totOcas ? pct(o.total/totOcas, 0) : '—'}</td></tr>`).join('')}</tbody>
+    <tfoot><tr><td>Total</td><td>${fmtN(totOcas)}</td><td>${fmtN(P.ocasMedia)}</td><td>${P.ocasFreq} de ${P.nMeses}</td><td></td></tr></tfoot>`
+    : `<tbody><tr><td class="empty" style="position:static">Nenhuma despesa ocasional em ${P.janela}.</td></tr></tbody>`;
+  $('#tbl-anal-top').innerHTML = P.ocasTop.length
+    ? `<thead><tr><th>Maiores ocasionais</th><th style="text-align:left">Descrição</th><th style="text-align:left">Categoria</th><th>Valor</th></tr></thead>
+    <tbody>${P.ocasTop.map(l=>`<tr><td>${fmtData(l.data)}</td><td class="desc">${esc(l.descricao)}</td><td style="text-align:left">${esc(D.categorias.includes(l.destino) ? l.destino : 'Sem categoria')}</td><td class="desp">${fmtN(l.valor)}</td></tr>`).join('')}</tbody>`
+    : '';
+}
+$('#anal-margem').onchange = e => { ANAL_MARGEM = +e.target.value || 0; renderAnalise(); };
+
 document.addEventListener('click', e => {
   const a = e.target.closest('a[data-ir]'); if(!a) return;
   e.preventDefault(); irParaAba(a.dataset.ir);
@@ -869,7 +1014,7 @@ document.addEventListener('click', e => {
 // ---------- Render ----------
 function renderTudo(){
   $('#subtitulo').textContent = `Contas do condomínio · ${ANO}`;
-  renderResumo(); renderDivergencias(); renderResumoReemb(); renderCotas(); renderDespesas(); renderReembolsos(); renderLanc(); renderCadastros(); fillMesRef(); atualizarInterPeriodo();
+  renderResumo(); renderDivergencias(); renderResumoReemb(); renderCotas(); renderDespesas(); renderAnalise(); renderReembolsos(); renderLanc(); renderCadastros(); fillMesRef(); atualizarInterPeriodo();
 }
 const thMeses = () => MESES.map((m,i)=>`<th class="${i===hoje.getMonth()&&ANO===hoje.getFullYear()?'mes-atual':''}">${m}</th>`).join('');
 const tdVals = (vals, cls) => vals.map(v=>{ v=v||0; return `<td class="${v===0?'zero':(cls||(v<0?'neg':''))}">${v===0?'—':fmtN(v)}</td>`; }).join('');
@@ -1023,7 +1168,7 @@ function renderDespesas(){
   $('#desp-nota').textContent = (CAN_WRITE
     ? 'Marque a caixa das despesas que se repetem todo mês. '
     : 'Despesas com ↻ são recorrentes. ')
-    + `A média de ${P.janela} de cada recorrente vira a previsão mensal no Resumo (meses sem pagamento contam como zero). As não marcadas são ocasionais: tudo o que foi gasto com elas no período, dividido por ${P.nMeses}, entra na previsão como reserva mensal (${fmt(P.ocasMedia)}).`;
+    + `A média de ${P.janela} de cada recorrente vira a previsão mensal no Resumo (meses sem pagamento contam como zero). As não marcadas são ocasionais e não entram na previsão do mês` + (IS_ADMIN ? ` — a média delas (${fmt(P.ocasMedia)}/mês) é usada na aba Análise para avaliar se a cota cobre as despesas.` : '.');
   $('#tbl-despesas').onchange = async e => {
     const chk = e.target.closest('input[data-rec]'); if(!chk || !CAN_WRITE) return;
     const cat = chk.dataset.rec, marcar = chk.checked;
