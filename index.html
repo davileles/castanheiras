@@ -198,6 +198,22 @@ tr.off td{opacity:.45}
 .kpi span{display:block;font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px}
 .kpi b{display:block;font-size:19px;font-weight:800;letter-spacing:-.4px;margin-top:5px}
 .kpi b.pos{color:var(--green)} .kpi b.neg{color:var(--red)} .kpi b.off{color:var(--muted)}
+.kpi small{display:block;font-size:10.5px;font-weight:600;color:var(--muted);margin-top:3px;line-height:1.35}
+/* ══ PREVISAO ══
+   Parte prevista da barra: listrada e translucida, empilhada sobre o realizado.
+   --p e a fracao da barra que ainda e previsao (100% nos meses futuros). */
+.mes .bar i.r.prev{background:linear-gradient(to bottom,transparent var(--p),var(--green) var(--p)),repeating-linear-gradient(135deg,color-mix(in srgb,var(--green) 60%,transparent) 0 3px,color-mix(in srgb,var(--green) 20%,transparent) 3px 6px)}
+.mes .bar i.d.prev{background:linear-gradient(to bottom,transparent var(--p),var(--red) var(--p)),repeating-linear-gradient(135deg,color-mix(in srgb,var(--red) 60%,transparent) 0 3px,color-mix(in srgb,var(--red) 20%,transparent) 3px 6px)}
+.mes .vals b.prev{opacity:.65;font-style:italic}
+.legend .p{background:repeating-linear-gradient(135deg,var(--muted) 0 2px,transparent 2px 4px)}
+.kpi-cap{padding:0 18px 8px;font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
+.kpis.prev .kpi{border-style:dashed}
+#tbl-prev td:first-child,#tbl-prev-rec td:first-child{font-weight:700}
+#tbl-prev tr.atual td{background:var(--card-deep)}
+.prev-sep{border-top:1px solid var(--border)}
+.rec-chk{margin-right:9px;vertical-align:-2px}
+.rec-mark{color:var(--accent);font-weight:800;margin-right:6px}
+#tbl-despesas th.col-tot,#tbl-despesas td.col-tot{border-left:1px solid var(--border-ctrl)}
 
 /* ══ IMPORTACAO ══ */
 .drop{border:1.5px dashed var(--border-ctrl);border-radius:14px;padding:32px;text-align:center;background:var(--surface);color:var(--muted);display:block;font-size:12.5px;font-weight:600;transition:all .15s}
@@ -322,7 +338,17 @@ td.check{text-align:center;width:80px}
       <h2>Receitas e despesas por mês <span class="status" id="kpi-mes"></span></h2>
       <div class="meses" id="meses"></div>
       <div class="kpis" id="kpis"></div>
-      <div class="legend"><span><i class="r"></i>Receitas</span><span><i class="d"></i>Despesas</span></div>
+      <div id="prev-kpis-wrap" hidden>
+        <div class="kpi-cap" id="prev-cap"></div>
+        <div class="kpis prev" id="kpis-prev"></div>
+      </div>
+      <div class="legend"><span><i class="r"></i>Receitas</span><span><i class="d"></i>Despesas</span><span id="leg-prev" hidden><i class="p"></i>Previsto — cotas a receber e despesas recorrentes</span></div>
+    </div>
+    <div class="card" id="card-prev" hidden>
+      <h2>Previsão dos próximos meses <span class="status" id="prev-status"></span></h2>
+      <div class="scroll"><table id="tbl-prev"></table></div>
+      <div class="scroll prev-sep"><table id="tbl-prev-rec"></table></div>
+      <div class="result status" id="prev-nota"></div>
     </div>
     <div class="card admin-only" id="card-diverg" hidden>
       <h2>Divergências de cota <span class="status" id="diverg-status"></span></h2>
@@ -349,6 +375,7 @@ td.check{text-align:center;width:80px}
     <div class="card">
       <h2>Despesas por categoria <span class="status edit-only">Clique numa célula para registrar uma despesa</span></h2>
       <div class="scroll"><table id="tbl-despesas"></table></div>
+      <div class="result status" id="desp-nota"></div>
     </div>
   </section>
 
@@ -527,6 +554,8 @@ function ordenar(d){
   // Arquivo antigo nao tem a lista de reembolsos: cria vazia para o resto do
   // codigo nunca precisar checar existencia.
   if(!Array.isArray(d.reembolsos)) d.reembolsos = [];
+  if(!Array.isArray(d.recorrentes)) d.recorrentes = [];
+  d.recorrentes = [...new Set(d.recorrentes)].sort((a,b)=> ordCmp.compare(a||'', b||''));
   d.reembolsos.sort((a,b)=> String(a.data||'').localeCompare(String(b.data||'')));
   return d;
 }
@@ -659,6 +688,150 @@ function calcGeral(){
   return { ok:true, saldo:r2(s), base, ignorados };
 }
 
+// ---------- Previsão ----------
+// Recorrente = categoria marcada na aba Despesas. A previsão mensal de cada uma
+// é a média dos últimos 6 meses FECHADOS (o mês corrente não entra, ainda está
+// pela metade). Mês sem pagamento conta como zero: conta bimestral não é
+// prevista em dobro. O que não está marcado é avulso e fica fora da previsão.
+// Receita prevista = cotas cadastradas. Tudo é relativo a hoje, não ao ano
+// escolhido no seletor.
+const PREV_JANELA = 6, PREV_HORIZONTE = 6;
+const kMes = (a,m) => a*12 + m;
+const rotMes = k => `${MESES[k%12]}/${Math.floor(k/12)}`;
+function calcPrevisao(){
+  const anoH = hoje.getFullYear(), mesH = hoje.getMonth(), kH = kMes(anoH, mesH), diaH = hoje.getDate();
+  const marcadas = new Set((D.recorrentes||[]).filter(c => D.categorias.includes(c)));
+  let kMin = Infinity, ultimo = '';
+  const porCat = {}, dias = {};
+  for (const l of D.lancamentos){
+    const k = kMes(+l.data.slice(0,4), +l.data.slice(5,7)-1);
+    if (k < kMin) kMin = k;
+    if (l.data > ultimo) ultimo = l.data;
+    if (l.tipo === 'receita') continue;
+    const v = (porCat[l.destino] = porCat[l.destino] || {});
+    v[k] = (v[k]||0) + l.valor;
+    if (k >= kH-PREV_JANELA && k < kH && l.valor > 0) (dias[l.destino] = dias[l.destino] || []).push(+l.data.slice(8,10));
+  }
+  // Antes do primeiro lançamento não existe histórico: a média divide só pelos
+  // meses que o sistema de fato acompanhou.
+  const kIni = Math.max(kH-PREV_JANELA, kMin === Infinity ? kH-PREV_JANELA : kMin);
+  const nMeses = Math.max(1, kH - kIni);
+  const cats = D.categorias.map(cat => {
+    const v = porCat[cat] || {};
+    let soma = 0, freq = 0;
+    for (let k = kIni; k < kH; k++){ const x = v[k]||0; soma += x; if (x > 0.005) freq++; }
+    const media = r2(soma / nMeses), pagoMes = r2(v[kH]||0);
+    const ds = (dias[cat]||[]).sort((a,b)=>a-b);
+    const dia = ds.length ? ds[Math.floor((ds.length-1)/2)] : null;
+    const recorrente = marcadas.has(cat);
+    // Conta recorrente sai uma vez por mês: se já saiu, o mês está quitado,
+    // mesmo que o valor tenha ficado abaixo da média.
+    const pendente = recorrente && pagoMes <= 0.005 ? media : 0;
+    return { cat, media, freq, pagoMes, dia, recorrente, pendente, passou: !!(pendente && dia && dia < diaH) };
+  });
+  const recs = cats.filter(x => x.recorrente);
+
+  // Cotas: quem é admin tem o cadastro por apartamento; quem não é recebe só o
+  // total mensal, sem autoria, e a conta é feita pelo total.
+  const porApto = D.moradores.length > 0;
+  const cotaTotal = r2(porApto ? D.moradores.reduce((s,m)=>s+(+m.valorCota||0),0) : (+D.cotaMensalTotal||0));
+  const recebido = {};
+  for (const l of D.lancamentos){
+    if (l.tipo !== 'receita' || !l.data.startsWith(String(anoH))) continue;
+    const mp = +l.data.slice(5,7)-1, mr = mesIdx(l.mesRef) >= 0 ? mesIdx(l.mesRef) : mp;
+    (recebido[l.destino] = recebido[l.destino] || Array(12).fill(0))[mr] += l.valor;
+  }
+  const falta = i => porApto
+    ? D.moradores.reduce((s,m)=> s + Math.max(0, (+m.valorCota||0) - ((recebido[m.apto]||[])[i]||0)), 0)
+    : Math.max(0, cotaTotal - Object.values(recebido).reduce((s,a)=>s+(a[i]||0),0));
+  const cotasPendMes = r2(falta(mesH));
+  let cotasAtraso = 0; for (let i = 0; i < mesH; i++) cotasAtraso += falta(i);
+
+  const despMensal = r2(recs.reduce((s,x)=>s+x.media,0));
+  const despPendMes = r2(recs.reduce((s,x)=>s+x.pendente,0));
+  const avulsas = r2(cats.filter(x=>!x.recorrente).reduce((s,x)=>s+x.media,0));
+  const restituir = r2(rbLista().filter(rbAberto).reduce((s,r)=>s+(+r.valor||0),0));
+  const G = calcGeral();
+  const meses = [];
+  let saldo = G.ok ? G.saldo : null;
+  for (let j = 0; j < PREV_HORIZONTE; j++){
+    const k = kH + j;
+    const receber = j === 0 ? cotasPendMes : cotaTotal;
+    const pagar = j === 0 ? r2(despPendMes + restituir) : despMensal;
+    const res = r2(receber - pagar);
+    if (saldo !== null) saldo = r2(saldo + res);
+    meses.push({ k, a: Math.floor(k/12), m: k%12, receber, pagar, res, saldo });
+  }
+  return { anoH, mesH, kH, kIni, nMeses, janela: `${rotMes(kIni)} a ${rotMes(kH-1)}`, cats, recs,
+    cotaTotal, cotasPendMes, cotasAtraso: r2(cotasAtraso), despMensal, despPendMes, avulsas, restituir,
+    meses, saldoAtual: G.ok ? G.saldo : null, ultimo };
+}
+
+function renderPrevisao(P){
+  const card = $('#card-prev'), wrap = $('#prev-kpis-wrap');
+  const ativo = !!P && ANO === P.anoH;
+  card.hidden = !ativo; wrap.hidden = !ativo;
+  if(!ativo) return;
+  const mesNome = rotMes(P.kH), m0 = P.meses[0];
+  const semRec = !P.recs.length;
+  const dicaRec = CAN_WRITE ? 'marque as recorrentes na aba Despesas' : 'nenhuma despesa marcada como recorrente';
+
+  // KPIs do mês corrente
+  const C = calc();
+  const resPrev = r2((C.rec[P.mesH]||0) - (C.desp[P.mesH]||0) + m0.res);
+  $('#prev-cap').textContent = `Previsão para ${mesNome} · o que ainda falta entrar e sair`;
+  const nPend = P.recs.filter(x=>x.pendente).length;
+  $('#kpis-prev').innerHTML = [
+    ['Cotas a receber', fmt(m0.receber), m0.receber ? 'pos' : 'off', m0.receber ? `de ${fmt(P.cotaTotal)} previstos no mês` : 'todas as cotas do mês entraram'],
+    ['Despesas pendentes', semRec && !P.restituir ? '—' : fmt(m0.pagar), m0.pagar ? 'neg' : 'off',
+      semRec ? dicaRec : (nPend ? `${nPend} recorrente${nPend>1?'s':''} ainda não paga${nPend>1?'s':''}` : 'recorrentes do mês já pagas') + (P.restituir ? ` · inclui ${fmt(P.restituir)} a restituir` : '')],
+    ['Resultado previsto do mês', (resPrev>0?'+':'')+fmt(resPrev), resPrev>0 ? 'pos' : (resPrev<0 ? 'neg' : 'off'), 'realizado + pendências'],
+    ['Saldo previsto no fim do mês', m0.saldo !== null ? fmt(m0.saldo) : '—', m0.saldo === null ? 'off' : (m0.saldo < 0 ? 'neg' : ''), P.saldoAtual !== null ? `hoje ${fmt(P.saldoAtual)}` : 'defina o saldo inicial'],
+  ].map(([l,v,cl,sub])=>`<div class="kpi"><span>${l}</span><b class="${cl}">${v}</b><small>${esc(sub)}</small></div>`).join('');
+
+  // Projeção
+  $('#prev-status').textContent = `média de ${P.janela}` + (P.ultimo ? ` · extrato até ${fmtData(P.ultimo)}` : '');
+  const tot = (k) => r2(P.meses.reduce((s,x)=>s+x[k],0));
+  const cls = v => v < 0 ? 'neg' : '';
+  $('#tbl-prev').innerHTML = `<thead><tr><th>Mês</th><th>A receber (cotas)</th><th>A pagar (recorrentes)</th><th>Resultado previsto</th><th>Saldo previsto</th></tr></thead>
+  <tbody>${P.meses.map((x,j)=>`<tr class="${j===0?'atual':''}">
+    <td>${rotMes(x.k)}${j===0?' <span class="status">restante</span>':''}</td>
+    <td class="${x.receber?'rec':'zero'}">${x.receber?fmtN(x.receber):'—'}</td>
+    <td class="${x.pagar?'desp':'zero'}">${x.pagar?fmtN(x.pagar):'—'}</td>
+    <td class="${x.res?cls(x.res):'zero'}">${x.res?(x.res>0?'+':'')+fmtN(x.res):'—'}</td>
+    <td class="${x.saldo===null?'zero':cls(x.saldo)}"><b>${x.saldo===null?'—':fmtN(x.saldo)}</b></td>
+  </tr>`).join('')}</tbody>
+  <tfoot><tr><td>${PREV_HORIZONTE} meses</td><td>${fmtN(tot('receber'))}</td><td>${fmtN(tot('pagar'))}</td><td>${(tot('res')>0?'+':'')+fmtN(tot('res'))}</td><td></td></tr></tfoot>`;
+
+  // Recorrentes do mês corrente
+  if(semRec && !P.restituir){
+    $('#tbl-prev-rec').innerHTML = `<tbody><tr><td class="empty" style="position:static">Nenhuma despesa recorrente marcada — ${CAN_WRITE ? 'marque na aba <a href="#" data-ir="despesas">Despesas</a> as contas que se repetem todo mês (água, luz, conservadora…) para elas entrarem na previsão.' : 'a previsão considera só as cotas.'}</td></tr></tbody>`;
+  } else {
+    const situ = x => !x.pendente ? (x.pagoMes > 0 ? '<span class="tag quit">Paga</span>' : '<span class="tag">Sem previsão</span>')
+      : x.passou ? `<span class="tag aberto">Costuma sair dia ${x.dia}</span>` : `<span class="tag pend">${x.dia ? `Costuma sair dia ${x.dia}` : 'Pendente'}</span>`;
+    const somaMed = r2(P.recs.reduce((s,x)=>s+x.media,0)), somaPago = r2(P.recs.reduce((s,x)=>s+Math.max(0,x.pagoMes),0));
+    $('#tbl-prev-rec').innerHTML = `<thead><tr><th>Recorrentes de ${mesNome}</th><th>Média ${P.nMeses}m</th><th>Pago no mês</th><th>Pendente</th><th>Situação</th></tr></thead>
+    <tbody>${P.recs.map(x=>`<tr>
+      <td>${esc(x.cat)}</td>
+      <td class="${x.media?'':'zero'}" title="Pago em ${x.freq} de ${P.nMeses} meses">${x.media?fmtN(x.media):'—'}</td>
+      <td class="${x.pagoMes>0?'':'zero'}">${x.pagoMes>0?fmtN(x.pagoMes):'—'}</td>
+      <td class="${x.pendente?'desp':'zero'}">${x.pendente?fmtN(x.pendente):'—'}</td>
+      <td>${situ(x)}</td>
+    </tr>`).join('')}${P.restituir ? `<tr><td>Restituições em aberto</td><td class="zero">—</td><td class="zero">—</td><td class="desp">${fmtN(P.restituir)}</td><td><span class="tag pend">A restituir</span></td></tr>` : ''}</tbody>
+    <tfoot><tr><td>Total</td><td>${fmtN(somaMed)}</td><td>${fmtN(somaPago)}</td><td>${fmtN(m0.pagar)}</td><td></td></tr></tfoot>`;
+  }
+  const fora = [];
+  if (P.avulsas) fora.push(`despesas avulsas (média de ${fmt(P.avulsas)}/mês)`);
+  if (P.cotasAtraso) fora.push(`cotas de meses anteriores ainda em aberto (${fmt(P.cotasAtraso)})`);
+  $('#prev-nota').innerHTML = `Previsão = cotas cadastradas (${fmt(P.cotaTotal)}/mês) menos a média de ${P.janela} das despesas recorrentes (${fmt(P.despMensal)}/mês).`
+    + (fora.length ? ` Ficam fora: ${fora.join(' e ')}.` : '')
+    + ` As pendências de ${mesNome} dependem do extrato estar importado.`;
+}
+document.addEventListener('click', e => {
+  const a = e.target.closest('a[data-ir]'); if(!a) return;
+  e.preventDefault(); irParaAba(a.dataset.ir);
+});
+
 // ---------- Render ----------
 function renderTudo(){
   $('#subtitulo').textContent = `Contas do condomínio · ${ANO}`;
@@ -735,8 +908,25 @@ function renderResumo(){
     ['Resultado do mês', (kRes>0?'+':'')+fmt(kRes), kRes>0 ? 'pos' : (kRes<0 ? 'neg' : 'off')],
     ['Saldo acumulado', C.temIni ? fmt(kAcum??0) : '—', !C.temIni ? 'off' : ((kAcum??0) < 0 ? 'neg' : '')],
   ].map(([l,v,cl])=>`<div class="kpi"><span>${l}</span><b class="${cl}">${v}</b></div>`).join('');
-  const max = Math.max(1,...C.rec,...C.desp);
-  $('#meses').innerHTML = MESES.map((m,i)=>`<div class="mes" title="${m}: receitas ${fmt(C.rec[i])} · despesas ${fmt(C.desp[i])}"><div class="vals"><b class="r${C.rec[i]?'':' zero'}">${fmtK(C.rec[i])}</b><b class="d${C.desp[i]?'':' zero'}">${fmtK(C.desp[i])}</b></div><div class="bar"><i class="r" style="height:${C.rec[i]/max*100}%"></i><i class="d" style="height:${C.desp[i]/max*100}%"></i></div><label>${m}</label></div>`).join('');
+  // Previsao so faz sentido no ano corrente: a partir do mes de hoje as barras
+  // ganham, empilhado e listrado, o que ainda falta entrar e sair.
+  const P = calcPrevisao();
+  const prevR = Array(12).fill(0), prevD = Array(12).fill(0);
+  if (ANO === P.anoH) P.meses.forEach(x => { if (x.a === ANO){ prevR[x.m] = x.receber; prevD[x.m] = x.pagar; } });
+  $('#leg-prev').hidden = !(prevR.some(Boolean) || prevD.some(Boolean));
+  const max = Math.max(1,...C.rec.map((v,i)=>v+prevR[i]),...C.desp.map((v,i)=>v+prevD[i]));
+  const barra = (cl, real, prev) => {
+    const tot = Math.max(0, real) + prev;
+    return `<i class="${cl}${prev?' prev':''}" style="height:${tot/max*100}%;--p:${tot ? prev/tot*100 : 0}%"></i>`;
+  };
+  const rotulo = (cl, real, prev) => real || !prev
+    ? `<b class="${cl}${real?'':' zero'}">${fmtK(real)}</b>`
+    : `<b class="${cl} prev">${fmtK(prev)}</b>`;
+  $('#meses').innerHTML = MESES.map((m,i)=>{
+    const tit = `${m}: receitas ${fmt(C.rec[i])} · despesas ${fmt(C.desp[i])}` + (prevR[i]||prevD[i] ? ` · previsto a receber ${fmt(prevR[i])} · previsto a pagar ${fmt(prevD[i])}` : '');
+    return `<div class="mes" title="${tit}"><div class="vals">${rotulo('r',C.rec[i],prevR[i])}${rotulo('d',C.desp[i],prevD[i])}</div><div class="bar">${barra('r',C.rec[i],prevR[i])}${barra('d',C.desp[i],prevD[i])}</div><label>${m}</label></div>`;
+  }).join('');
+  renderPrevisao(P);
   const tot = a => a.reduce((s,v)=>s+(v||0),0);
   const linhas = [
     ['Saldo do mês anterior', C.saldoAnt.map(v=>v??0)],
@@ -787,11 +977,29 @@ function renderCotas(){
 }
 
 function renderDespesas(){
-  const C = calc();
-  $('#tbl-despesas').innerHTML = `<thead><tr><th>Categoria</th>${thMeses()}<th>Total</th></tr></thead>
-  <tbody>${D.categorias.map(c=>{ const v=C.despCat[c]||Array(12).fill(0);
-    return `<tr><td>${esc(c)}</td>${MESES.map((mes,i)=>`<td class="edit ${v[i]?'':'zero'}" data-cat="${esc(c)}" data-mes="${mes}" data-v="${v[i]||0}">${v[i]?fmtN(v[i]):'—'}</td>`).join('')}<td><b>${fmtN(v.reduce((s,x)=>s+x,0))}</b></td></tr>`;}).join('')}</tbody>
-  <tfoot><tr><td>Total</td>${C.desp.map(v=>`<td>${v?fmtN(v):'—'}</td>`).join('')}<td>${fmtN(C.desp.reduce((s,v)=>s+v,0))}</td></tr></tfoot>`;
+  const C = calc(), P = calcPrevisao();
+  const info = Object.fromEntries(P.cats.map(x=>[x.cat,x]));
+  $('#tbl-despesas').innerHTML = `<thead><tr><th>Categoria</th>${thMeses()}<th class="col-tot">Total</th><th title="Média mensal de ${P.janela}">Média ${P.nMeses}m</th></tr></thead>
+  <tbody>${D.categorias.map(c=>{ const v=C.despCat[c]||Array(12).fill(0), p=info[c];
+    const marca = CAN_WRITE
+      ? `<input type="checkbox" class="rec-chk" data-rec="${esc(c)}" ${p.recorrente?'checked':''} title="Despesa recorrente — entra na previsão mensal">`
+      : (p.recorrente ? '<span class="rec-mark" title="Despesa recorrente">↻</span>' : '');
+    return `<tr><td>${marca}${esc(c)}</td>${MESES.map((mes,i)=>`<td class="edit ${v[i]?'':'zero'}" data-cat="${esc(c)}" data-mes="${mes}" data-v="${v[i]||0}">${v[i]?fmtN(v[i]):'—'}</td>`).join('')}<td class="col-tot"><b>${fmtN(v.reduce((s,x)=>s+x,0))}</b></td><td class="${p.media?'':'zero'}" title="Pago em ${p.freq} de ${P.nMeses} meses">${p.media?fmtN(p.media):'—'}</td></tr>`;}).join('')}</tbody>
+  <tfoot><tr><td>Total</td>${C.desp.map(v=>`<td>${v?fmtN(v):'—'}</td>`).join('')}<td class="col-tot">${fmtN(C.desp.reduce((s,v)=>s+v,0))}</td><td title="Soma das médias das recorrentes">${P.recs.length?fmtN(P.despMensal):'—'}</td></tr></tfoot>`;
+  $('#desp-nota').textContent = (CAN_WRITE
+    ? 'Marque a caixa das despesas que se repetem todo mês. '
+    : 'Despesas com ↻ são recorrentes. ')
+    + `A média de ${P.janela} de cada recorrente vira a previsão mensal no Resumo (meses sem pagamento contam como zero). As não marcadas são avulsas e ficam fora da previsão.`;
+  $('#tbl-despesas').onchange = async e => {
+    const chk = e.target.closest('input[data-rec]'); if(!chk || !CAN_WRITE) return;
+    const cat = chk.dataset.rec, marcar = chk.checked;
+    chk.disabled = true;
+    try {
+      await salvar(d => { const s = new Set(d.recorrentes||[]); marcar ? s.add(cat) : s.delete(cat); d.recorrentes = [...s]; },
+        `${marcar ? 'Marca' : 'Desmarca'} ${cat} como recorrente`);
+      toast(marcar ? `${cat} entrou na previsão` : `${cat} saiu da previsão`);
+    } catch(err){ chk.checked = !marcar; chk.disabled = false; toast(err.message,true); }
+  };
   $('#tbl-despesas').onclick = async e => {
     if(!CAN_WRITE) return;
     const td = e.target.closest('td.edit'); if(!td) return;
@@ -907,7 +1115,7 @@ $('#btn-add-regra').onclick = ()=> addRow('#tbl-regras', rowRegra());
 $('#btn-add-cat').onclick = ()=> addRow('#tbl-cats', rowCat());
 $('#btn-save-moradores').onclick = async ()=>{ const rows=readRows('#tbl-moradores').filter(m=>m.apto); try{ await salvar(d=>{ d.moradores=rows; }, 'Atualiza moradores'); toast('Moradores salvos'); }catch(e){toast(e.message,true);} };
 $('#btn-save-regras').onclick = async ()=>{ const rows=readRows('#tbl-regras').filter(r=>r.chave); try{ await salvar(d=>{ d.regras=rows; }, 'Atualiza regras'); toast('Regras salvas'); }catch(e){toast(e.message,true);} };
-$('#btn-save-cats').onclick = async ()=>{ const rows=readRows('#tbl-cats').map(r=>r.nome).filter(Boolean); try{ await salvar(d=>{ d.categorias=rows; }, 'Atualiza categorias'); toast('Categorias salvas'); }catch(e){toast(e.message,true);} };
+$('#btn-save-cats').onclick = async ()=>{ const rows=readRows('#tbl-cats').map(r=>r.nome).filter(Boolean); try{ await salvar(d=>{ d.categorias=rows; d.recorrentes=(d.recorrentes||[]).filter(c=>rows.includes(c)); }, 'Atualiza categorias'); toast('Categorias salvas'); }catch(e){toast(e.message,true);} };
 
 // ---------- Configuração: acessos ----------
 // A lista de e-mails nunca viaja junto com as contas — vive nos endpoints

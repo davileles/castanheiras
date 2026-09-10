@@ -29,6 +29,9 @@ const BASE = {
   // Ficam fora de `lancamentos` de propósito: as contas são regime de caixa, e
   // a despesa só existe quando o dinheiro sai da conta.
   reembolsos: [],
+  // Categorias de despesa marcadas como recorrentes: a média dos últimos 6
+  // meses de cada uma vira a previsão mensal no Resumo.
+  recorrentes: [],
   saldoInicial: {},
   acessos: [],
   // Subconjunto de `acessos` que enxerga tudo. Vazio = arquivo anterior a esta
@@ -106,6 +109,9 @@ function semAcessos(d) {
 // autoria some.
 function redigir(d) {
   const out = { ...d };
+  // A previsão de receitas precisa do total mensal de cotas; o total não
+  // identifica ninguém, o cadastro por apartamento sim.
+  out.cotaMensalTotal = Math.round((d.moradores || []).reduce((s, m) => s + (Number(m.valorCota) || 0), 0) * 100) / 100;
   out.moradores = [];
   out.lancamentos = (d.lancamentos || []).map(l => {
     if (/receita/.test(l.tipo || '')) return { ...l, destino: '', descricao: 'Cota condominial', obs: '' };
