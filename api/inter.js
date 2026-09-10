@@ -58,7 +58,7 @@ function requisitar(metodo, caminho, { corpo, headers, timeout = 30000 } = {}) {
       res.on('end', () => {
         let json = null;
         try { json = JSON.parse(dados); } catch {}
-        resolve({ status: res.statusCode, json, texto: json ? null : dados.slice(0, 600) });
+        resolve({ status: res.statusCode, headers: res.headers, json, texto: json ? null : dados.slice(0, 600) });
       });
     });
     req.on('timeout', () => req.destroy(new Error('Timeout na chamada ao Inter')));
@@ -157,15 +157,33 @@ async function saldo() {
   return r.json;
 }
 
-// Percorre a paginação até o fim. O Inter limita a janela de consulta, então
-// períodos longos devem ser quebrados por quem chama.
+const dormir = (ms) => new Promise(r => setTimeout(r, ms));
+
+// Medido contra a API, não deduzido da documentação: o Inter recusa quando a
+// diferença entre as datas chega a 90 dias. 89 passa.
+const JANELA_MAX = 89;
+// E responde 429 quando as chamadas vêm coladas. Backoff exponencial, honrando
+// Retry-After quando ele vem.
+async function comRetentativa(caminho) {
+  let espera = 4000;
+  for (let tentativa = 0; tentativa < 4; tentativa++) {
+    const r = await autenticado('GET', caminho);
+    if (r.status !== 429) return r;
+    const sugerido = Number(r.headers && r.headers['retry-after']) * 1000;
+    await dormir(sugerido > 0 ? sugerido : espera);
+    espera *= 2;
+  }
+  throw new Error('Inter recusou por excesso de chamadas (429) mesmo após 4 tentativas — tente de novo em alguns minutos');
+}
+
+// Percorre a paginação de UMA janela.
 async function extrato(inicio, fim) {
   if (!rotaExtrato) await descobrir();
   if (!rotaExtrato) throw new Error('Nenhum endpoint de extrato respondeu — rode /inter/status');
   const itens = [];
   let pagina = 0, total = 1;
   while (pagina < total && pagina < 50) {
-    const r = await autenticado('GET', `${rotaExtrato}?dataInicio=${inicio}&dataFim=${fim}&pagina=${pagina}&tamanhoPagina=100`);
+    const r = await comRetentativa(`${rotaExtrato}?dataInicio=${inicio}&dataFim=${fim}&pagina=${pagina}&tamanhoPagina=100`);
     if (r.status !== 200) throw new Error(`Extrato (${r.status}): ${JSON.stringify(r.json || r.texto)}`);
     const j = r.json || {};
     const lote = j.transacoes || j.content || j.itens || (Array.isArray(j) ? j : []);
@@ -175,6 +193,34 @@ async function extrato(inicio, fim) {
     if (!lote.length) break;
   }
   return { rota: rotaExtrato, inicio, fim, total: itens.length, itens };
+}
+
+const dia = (iso, n) => { const d = new Date(iso + 'T12:00:00Z'); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+
+// Quebra qualquer período em janelas de 89 dias, com pausa entre elas para não
+// esbarrar no rate limit. Um ano inteiro sai em 5 chamadas.
+function janelas(inicio, fim) {
+  const out = [];
+  let ini = inicio;
+  while (ini <= fim) {
+    const provisorio = dia(ini, JANELA_MAX);
+    const f = provisorio > fim ? fim : provisorio;
+    out.push({ inicio: ini, fim: f });
+    if (f >= fim) break;
+    ini = dia(f, 1);
+  }
+  return out;
+}
+
+async function extratoLongo(inicio, fim) {
+  const partes = janelas(inicio, fim);
+  const itens = [];
+  for (let i = 0; i < partes.length; i++) {
+    if (i > 0) await dormir(2500);
+    const r = await extrato(partes[i].inicio, partes[i].fim);
+    itens.push(...r.itens);
+  }
+  return { rota: rotaExtrato, inicio, fim, janelas: partes.length, total: itens.length, itens };
 }
 
 // Mesma função de hash do front-end, para o id da transação sobreviver a
@@ -218,8 +264,16 @@ function normalizar(t) {
 }
 
 async function transacoes(inicio, fim) {
-  const r = await extrato(inicio, fim);
-  return { ...r, itens: r.itens.map(normalizar).filter(t => t.data && t.valor > 0) };
+  const r = await extratoLongo(inicio, fim);
+  // Fronteira de janela não deveria repetir, mas duplicata aqui vira lançamento
+  // duplicado lá na frente — o id do Inter é estável, então filtrar é barato.
+  const vistos = new Set();
+  const itens = r.itens.map(normalizar).filter(t => {
+    if (!t.data || !(t.valor > 0) || vistos.has(t.id)) return false;
+    vistos.add(t.id);
+    return true;
+  }).sort((a, b) => b.data.localeCompare(a.data));
+  return { ...r, total: itens.length, itens };
 }
 
-module.exports = { configurado, token, descobrir, saldo, extrato, transacoes, normalizar, periodoPadrao, cacheInfo: () => ({ temToken: !!cache.token, expiraEm: cache.expira ? new Date(cache.expira).toISOString() : null, escopos: cache.escopos }) };
+module.exports = { configurado, token, descobrir, saldo, extrato, extratoLongo, janelas, transacoes, normalizar, periodoPadrao, cacheInfo: () => ({ temToken: !!cache.token, expiraEm: cache.expira ? new Date(cache.expira).toISOString() : null, escopos: cache.escopos }) };
