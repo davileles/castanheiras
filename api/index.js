@@ -9,6 +9,7 @@
 // a API do GitHub.
 const express = require('express');
 const cors = require('cors');
+const inter = require('./inter');
 
 const app = express();
 app.use(cors());
@@ -203,13 +204,56 @@ rotas.post('/acessos', async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, erro: e.message }); }
 });
 
+// ── Banco Inter ──────────────────────────────────────────────────────────────
+// Leitura do extrato da conta do condomínio. Tudo aqui é somente admin: o
+// extrato traz nome e CPF de quem pagou, exatamente o que a visão de morador
+// não pode ver.
+async function exigirAdmin(req, res) {
+  const email = email_(req.query.email || (req.body && req.body.email));
+  const { dados } = await carregar();
+  if (!ehAdmin(dados, email)) { res.status(403).json({ ok: false, erro: 'Somente administradores' }); return null; }
+  return email;
+}
+
+rotas.get('/inter/status', async (req, res) => {
+  try {
+    if (!await exigirAdmin(req, res)) return;
+    const cfg = inter.configurado();
+    if (!cfg.ok) return res.json({ ok: false, configurado: cfg, erro: 'Faltam variáveis de ambiente' });
+    await inter.token();
+    // A descoberta de rota roda só aqui, no diagnóstico — nas chamadas normais
+    // o caminho já vem resolvido em memória.
+    const rotas_ = await inter.descobrir();
+    res.json({ ok: true, configurado: cfg, token: inter.cacheInfo(), rotas: rotas_ });
+  } catch (e) { res.status(500).json({ ok: false, erro: e.message }); }
+});
+
+rotas.get('/inter/saldo', async (req, res) => {
+  try {
+    if (!await exigirAdmin(req, res)) return;
+    res.json({ ok: true, saldo: await inter.saldo() });
+  } catch (e) { res.status(500).json({ ok: false, erro: e.message }); }
+});
+
+rotas.get('/inter/extrato', async (req, res) => {
+  try {
+    if (!await exigirAdmin(req, res)) return;
+    const p = inter.periodoPadrao(Number(req.query.dias) || 7);
+    const inicio = req.query.inicio || p.inicio;
+    const fim = req.query.fim || p.fim;
+    res.json({ ok: true, ...(await inter.extrato(inicio, fim)) });
+  } catch (e) { res.status(500).json({ ok: false, erro: e.message }); }
+});
+
 // O front-end antigo chama /castanheiras/*; o novo pode chamar a raiz. As duas
 // formas respondem, então a virada de URL não precisa ser simultânea.
 app.use('/castanheiras', rotas);
 app.use('/', rotas);
 
 app.get('/health', (req, res) => res.json({
-  status: 'ok', repo: GITHUB_REPO, arquivo: DADOS_PATH, token: GITHUB_TOKEN ? 'configurado' : 'AUSENTE'
+  status: 'ok', repo: GITHUB_REPO, arquivo: DADOS_PATH,
+  token: GITHUB_TOKEN ? 'configurado' : 'AUSENTE',
+  inter: inter.configurado()
 }));
 
 app.use((err, req, res, next) => {
