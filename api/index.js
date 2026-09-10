@@ -245,6 +245,15 @@ rotas.get('/inter/extrato', async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, erro: e.message }); }
 });
 
+// Extrato já traduzido para o formato da tela de importação.
+rotas.get('/inter/transacoes', async (req, res) => {
+  try {
+    if (!await exigirAdmin(req, res)) return;
+    const p = inter.periodoPadrao(Number(req.query.dias) || 15);
+    res.json({ ok: true, ...(await inter.transacoes(req.query.inicio || p.inicio, req.query.fim || p.fim)) });
+  } catch (e) { res.status(500).json({ ok: false, erro: e.message }); }
+});
+
 // O front-end antigo chama /castanheiras/*; o novo pode chamar a raiz. As duas
 // formas respondem, então a virada de URL não precisa ser simultânea.
 app.use('/castanheiras', rotas);
