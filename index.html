@@ -11,17 +11,21 @@
 /* ═══ Design system Tica Promos ═══
    Tokens, tipografia e componentes vindos do painel gestao.ticapromos.com.br.
    Paleta Tico: navy #2E3348, coral #FA5150, ardosia #767D93, cinza-luz #D4D7E2.
-   Verde/vermelho/ambar aqui sao sinalizacao de dado (entrou, saiu, atencao),
-   nao identidade de marca. */
+   Azul/laranja/amarelo aqui sao sinalizacao de dado (entrou, saiu, atencao),
+   nao identidade de marca.
+   Paleta segura para daltonismo: verde x vermelho some para quem tem
+   protanopia/deuteranopia, azul x laranja nao. Validado com simulacao
+   Machado 2009 — receita x despesa tinha distancia de cor ~20 (quase iguais) e
+   passou a ~110. Atencao nao depende so da cor: sempre vem com texto ou
+   contorno tracejado. */
 :root{
   --bg:#12141c;--surface:#1a1d28;--card:#232838;--card-deep:#161922;
   --border:#2e3348;--border-ctrl:#3c4256;
   --text:#f5f6fa;--muted:#8b92a8;--muted2:#666d85;
   --accent:#fa5150;--accent2:#d93636;
-  --green:#34d399;--red:#f87171;--amber:#fbbf24;
-  --rec:var(--green);--rec-soft:rgba(52,211,153,.14);
-  --desp:var(--red);--desp-soft:rgba(248,113,113,.14);
-  --warn:var(--amber);--warn-soft:rgba(251,191,36,.14);
+  --rec:#4da3ff;--rec-soft:rgba(77,163,255,.14);
+  --desp:#ff7a1a;--desp-soft:rgba(255,122,26,.14);
+  --warn:#ffd84a;--warn-soft:rgba(255,216,74,.14);
 }
 [data-theme="light"]{
   /* No claro o coral puro fecha so 3.3:1 sobre branco; --accent vira o coral
@@ -30,8 +34,8 @@
   --border:#d4d7e2;--border-ctrl:#b8bdce;
   --text:#2e3348;--muted:#6b7288;--muted2:#9ba1b4;
   --accent:#c22f2f;--accent2:#b02a2a;
-  --green:#16a34a;--red:#dc2626;--amber:#d97706;
-  --rec-soft:rgba(22,163,74,.12);--desp-soft:rgba(220,38,38,.12);--warn-soft:rgba(217,119,6,.12);
+  --rec:#1a5fb4;--desp:#b34700;--warn:#7a5b00;
+  --rec-soft:rgba(26,95,180,.12);--desp-soft:rgba(179,71,0,.12);--warn-soft:rgba(122,91,0,.12);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scrollbar-gutter:stable}
@@ -53,7 +57,7 @@ h1 small{display:block;font-size:10px;font-weight:700;color:var(--accent);letter
 .saldo{text-align:right;padding-bottom:14px;display:flex;align-items:center;gap:14px}
 .saldo div{text-align:right}
 .saldo b{display:block;font-size:24px;font-weight:800;letter-spacing:-.5px;line-height:1.15}
-.saldo b.neg{color:var(--red)}
+.saldo b.neg{color:var(--desp)}
 .saldo .sec b{font-size:15px;font-weight:700;color:var(--muted)}
 .saldo .sep{width:1px;align-self:stretch;background:var(--border);margin:2px 0}
 .saldo span{color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px}
@@ -80,7 +84,7 @@ nav button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--a
 .btn.secondary:hover{border-color:var(--accent);color:var(--accent);filter:none}
 .btn.small{padding:7px 14px;font-size:11px}
 .x{background:none;border:0;color:var(--muted2);font-size:16px;line-height:1;padding:4px 8px;border-radius:6px;transition:all .15s}
-.x:hover{background:var(--desp-soft);color:var(--red)}
+.x:hover{background:var(--desp-soft);color:var(--desp)}
 
 /* ══ FORM ══ */
 input[type=text],input[type=number],input[type=password],input[type=email],input[type=date],select{
@@ -111,20 +115,20 @@ tr:last-child td{border-bottom:0}
 tfoot td{font-weight:800;border-top:1px solid var(--border-ctrl);background:var(--card-deep)}
 tfoot td:first-child{background:var(--card-deep)}
 td.zero{color:var(--muted2);font-weight:500}
-td.rec{color:var(--green)} td.desp{color:var(--red)} td.neg{color:var(--red)}
+td.rec{color:var(--rec)} td.desp{color:var(--desp)} td.neg{color:var(--desp)}
 td.edit{cursor:pointer;transition:background .15s} td.edit:hover{background:var(--card)}
 body.ro td.edit{cursor:default} body.ro td.edit:hover{background:inherit}
-td.pend{background:var(--desp-soft);color:var(--red)}
-td.pago{background:var(--rec-soft);color:var(--green)}
+td.pend{background:var(--desp-soft);color:var(--desp)}
+td.pago{background:var(--rec-soft);color:var(--rec)}
 .tag{display:inline-block;font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;padding:3px 8px;border-radius:999px;white-space:nowrap}
-.tag.aberto{background:var(--desp-soft);color:var(--red)}
-.tag.menos{background:var(--warn-soft);color:var(--amber)}
-.tag.mais{background:var(--rec-soft);color:var(--green)}
-.tag.pend{background:var(--warn-soft);color:var(--amber)}
-.tag.quit{background:var(--rec-soft);color:var(--green)}
+.tag.aberto{background:var(--desp-soft);color:var(--desp)}
+.tag.menos{background:var(--warn-soft);color:var(--warn)}
+.tag.mais{background:var(--rec-soft);color:var(--rec)}
+.tag.pend{background:var(--warn-soft);color:var(--warn)}
+.tag.quit{background:var(--rec-soft);color:var(--rec)}
 
 /* ══ REEMBOLSOS ══ */
-nav button .badge{display:inline-block;margin-left:6px;background:var(--warn-soft);color:var(--amber);font-size:9px;font-weight:800;padding:1px 6px;border-radius:999px;vertical-align:1px}
+nav button .badge{display:inline-block;margin-left:6px;background:var(--warn-soft);color:var(--warn);font-size:9px;font-weight:800;padding:1px 6px;border-radius:999px;vertical-align:1px}
 .form-grid{display:grid;grid-template-columns:140px 1.1fr 1.6fr 1.2fr 120px auto;gap:10px;padding:15px 18px;align-items:end}
 .form-grid label{display:block;font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px}
 .form-grid .btn{white-space:nowrap}
@@ -153,7 +157,7 @@ td.mes-atual{box-shadow:inset 0 2px 0 var(--accent)}
 #tbl-resumo th:last-child,#tbl-resumo td:last-child,#tbl-cotas th:last-child,#tbl-cotas td:last-child,#tbl-despesas th:last-child,#tbl-despesas td:last-child{padding-right:14px;border-left:1px solid var(--border-ctrl)}
 /* Valor diferente da cota cadastrada: nem "pago" nem "pendente" contam essa
    historia sozinhos, entao a celula ganha contorno de atencao. */
-td.dif{box-shadow:inset 0 0 0 1.5px var(--amber)}
+td.dif{outline:1.5px dashed var(--warn);outline-offset:-4px}
 td.desc{text-align:left;white-space:normal;min-width:220px;max-width:360px;font-weight:500}
 /* Observacao e apoio, nao dado: fica em cinza para nao competir com a
    descricao, e quebra linha porque costuma ser frase inteira. */
@@ -164,7 +168,7 @@ td input[type=text]{width:100%;min-width:120px} td input.apto{min-width:60px;wid
 td.acao{text-align:center;width:auto;white-space:nowrap}
 .ed,.ok{background:none;border:0;color:var(--muted2);font-size:14px;line-height:1;padding:4px 8px;border-radius:6px;transition:all .15s}
 .ed:hover{background:var(--card);color:var(--accent)}
-.ok{color:var(--green)} .ok:hover{background:var(--rec-soft)}
+.ok{color:var(--rec)} .ok:hover{background:var(--rec-soft)}
 tr.editando td{background:var(--card-deep)}
 tr.editando .campos-destino{display:flex;gap:6px;flex-wrap:wrap}
 tr.editando td input[type=date]{width:auto;min-width:140px}
@@ -182,28 +186,28 @@ tr.off td{opacity:.45}
 .mes{display:flex;flex-direction:column;justify-content:flex-end;gap:3px;height:100%}
 .mes .bar{width:100%;display:flex;gap:2px;align-items:flex-end;flex:1}
 .mes .bar i{flex:1;border-radius:3px 3px 0 0;min-height:1px}
-.mes .bar i.r{background:var(--green)} .mes .bar i.d{background:var(--red)}
+.mes .bar i.r{background:var(--rec)} .mes .bar i.d{background:var(--desp)}
 .mes .vals{display:flex;flex-direction:column;gap:1px;text-align:center;line-height:1.3;min-height:26px;justify-content:flex-end}
 .mes .vals b{font-size:9px;font-weight:700;letter-spacing:-.2px;font-feature-settings:"tnum" 1}
-.mes .vals b.r{color:var(--green)} .mes .vals b.d{color:var(--red)}
+.mes .vals b.r{color:var(--rec)} .mes .vals b.d{color:var(--desp)}
 .mes .vals b.zero{color:var(--muted2);font-weight:600}
 .mes label{font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;text-align:center}
 .legend{display:flex;gap:16px;padding:0 18px 16px;font-size:11px;font-weight:600;color:var(--muted)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
-.legend .r{background:var(--green)} .legend .d{background:var(--red)}
+.legend .r{background:var(--rec)} .legend .d{background:var(--desp)}
 
 /* ══ KPIs DO MES ══ */
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:0 18px 18px}
 .kpi{background:var(--card-deep);border:1px solid var(--border);border-radius:12px;padding:12px 14px}
 .kpi span{display:block;font-size:9.5px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.7px}
 .kpi b{display:block;font-size:19px;font-weight:800;letter-spacing:-.4px;margin-top:5px}
-.kpi b.pos{color:var(--green)} .kpi b.neg{color:var(--red)} .kpi b.off{color:var(--muted)}
+.kpi b.pos{color:var(--rec)} .kpi b.neg{color:var(--desp)} .kpi b.off{color:var(--muted)}
 .kpi small{display:block;font-size:10.5px;font-weight:600;color:var(--muted);margin-top:3px;line-height:1.35}
 /* ══ PREVISAO ══
    Parte prevista da barra: listrada e translucida, empilhada sobre o realizado.
    --p e a fracao da barra que ainda e previsao (100% nos meses futuros). */
-.mes .bar i.r.prev{background:linear-gradient(to bottom,transparent var(--p),var(--green) var(--p)),repeating-linear-gradient(135deg,color-mix(in srgb,var(--green) 60%,transparent) 0 3px,color-mix(in srgb,var(--green) 20%,transparent) 3px 6px)}
-.mes .bar i.d.prev{background:linear-gradient(to bottom,transparent var(--p),var(--red) var(--p)),repeating-linear-gradient(135deg,color-mix(in srgb,var(--red) 60%,transparent) 0 3px,color-mix(in srgb,var(--red) 20%,transparent) 3px 6px)}
+.mes .bar i.r.prev{background:linear-gradient(to bottom,transparent var(--p),var(--rec) var(--p)),repeating-linear-gradient(135deg,color-mix(in srgb,var(--rec) 60%,transparent) 0 3px,color-mix(in srgb,var(--rec) 20%,transparent) 3px 6px)}
+.mes .bar i.d.prev{background:linear-gradient(to bottom,transparent var(--p),var(--desp) var(--p)),repeating-linear-gradient(135deg,color-mix(in srgb,var(--desp) 60%,transparent) 0 3px,color-mix(in srgb,var(--desp) 20%,transparent) 3px 6px)}
 .mes .vals b.prev{opacity:.65;font-style:italic}
 .legend .p{background:repeating-linear-gradient(135deg,var(--muted) 0 2px,transparent 2px 4px)}
 .kpi-cap{padding:0 18px 8px;font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.8px}
@@ -227,20 +231,20 @@ tr.off td{opacity:.45}
 .filtros .f:hover{color:var(--text)}
 .filtros .f.active{color:var(--accent);border-color:var(--accent);background:rgba(250,81,80,.10)}
 
-/* Linha incompleta: fundo ambar discreto e faixa na primeira celula, para
-   sobressair sem competir com o vermelho de despesa. */
-tr.atencao td{background:rgba(251,191,36,.10);border-bottom-color:rgba(251,191,36,.28)}
+/* Linha incompleta: fundo amarelo discreto e faixa na primeira celula, para
+   sobressair sem competir com o laranja de despesa. */
+tr.atencao td{background:color-mix(in srgb,var(--warn) 10%,transparent);border-bottom-color:color-mix(in srgb,var(--warn) 28%,transparent)}
 /* A faixa vai na 2a celula: os 3px da esquerda do card ja sao ocupados pela
-   listra vermelha, e um marcador ali ficaria escondido. */
-tr.atencao td:nth-child(2){box-shadow:inset 3px 0 0 var(--amber)}
-tr.atencao td:first-child{background:rgba(251,191,36,.10)}
-tr.atencao:hover td{background:rgba(251,191,36,.16)}
+   listra coral, e um marcador ali ficaria escondido. */
+tr.atencao td:nth-child(2){box-shadow:inset 3px 0 0 var(--warn)}
+tr.atencao td:first-child{background:color-mix(in srgb,var(--warn) 10%,var(--surface))}
+tr.atencao:hover td{background:color-mix(in srgb,var(--warn) 16%,transparent)}
 
 /* ══ PILLS ══ */
 .pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.4px}
-.pill.rec{background:var(--rec-soft);color:var(--green)}
-.pill.desp{background:var(--desp-soft);color:var(--red)}
-.pill.warn{background:var(--warn-soft);color:var(--amber)}
+.pill.rec{background:var(--rec-soft);color:var(--rec)}
+.pill.desp{background:var(--desp-soft);color:var(--desp)}
+.pill.warn{background:var(--warn-soft);color:var(--warn)}
 .pill.dup{background:var(--card);color:var(--muted)}
 
 .result{padding:15px 18px;font-size:12.5px;font-weight:600}
@@ -255,9 +259,9 @@ input[type=checkbox]{width:auto;accent-color:var(--accent);cursor:pointer;transf
 td.check{text-align:center;width:80px}
 
 /* ══ TOAST ══ */
-#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--card);border:1px solid var(--border-ctrl);border-left:3px solid var(--green);color:var(--text);padding:12px 18px;border-radius:12px;font-size:12.5px;font-weight:700;opacity:0;transition:.2s;pointer-events:none;max-width:90vw;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:200}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--card);border:1px solid var(--border-ctrl);border-left:3px solid var(--rec);color:var(--text);padding:12px 18px;border-radius:12px;font-size:12.5px;font-weight:700;opacity:0;transition:.2s;pointer-events:none;max-width:90vw;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:200}
 #toast.show{opacity:1;transform:translateX(-50%)}
-#toast.err{border-left-color:var(--red)}
+#toast.err{border-left-color:var(--desp)}
 
 /* ══ LOGIN ══ */
 #login{max-width:400px;margin:16vh auto 0;padding:0 24px}
@@ -808,7 +812,7 @@ function renderPrevisao(P){
     $('#tbl-prev-rec').innerHTML = `<tbody><tr><td class="empty" style="position:static">Nenhuma despesa recorrente marcada — ${CAN_WRITE ? 'marque na aba <a href="#" data-ir="despesas">Despesas</a> as contas que se repetem todo mês (água, luz, conservadora…) para elas entrarem na previsão.' : 'a previsão considera só as cotas.'}</td></tr></tbody>`;
   } else {
     const situ = x => !x.pendente ? (x.pagoMes > 0 ? '<span class="tag quit">Paga</span>' : '<span class="tag">Sem previsão</span>')
-      : x.passou ? `<span class="tag aberto">Costuma sair dia ${x.dia}</span>` : `<span class="tag pend">${x.dia ? `Costuma sair dia ${x.dia}` : 'Pendente'}</span>`;
+      : x.passou ? `<span class="tag aberto">Passou do dia ${x.dia}</span>` : `<span class="tag pend">${x.dia ? `Costuma sair dia ${x.dia}` : 'Pendente'}</span>`;
     const somaMed = r2(P.recs.reduce((s,x)=>s+x.media,0)), somaPago = r2(P.recs.reduce((s,x)=>s+Math.max(0,x.pagoMes),0));
     $('#tbl-prev-rec').innerHTML = `<thead><tr><th>Recorrentes de ${mesNome}</th><th>Média ${P.nMeses}m</th><th>Pago no mês</th><th>Pendente</th><th>Situação</th></tr></thead>
     <tbody>${P.recs.map(x=>`<tr>
