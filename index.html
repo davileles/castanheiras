@@ -753,7 +753,7 @@ function renderResumo(){
 }
 $('#saldo-ini').onclick = async e => {
   e.preventDefault();
-  const s = prompt(`Saldo em caixa no início de ${ANO} (R$):`, fmtN((D.saldoInicial||{})[ANO]||0)); if(s===null) return;
+  const s = prompt(`Saldo da conta no fim do dia 31/12/${ANO-1} (R$).\n\nNo extrato, use o saldo do último dia de ${ANO-1} — não o de 01/01/${ANO}, que já inclui as movimentações daquele dia.`, fmtN((D.saldoInicial||{})[ANO]||0)); if(s===null) return;
   try { await salvar(d=>{ d.saldoInicial = d.saldoInicial||{}; d.saldoInicial[ANO] = parseBR(s); }, `Saldo inicial ${ANO}`); toast('Saldo inicial salvo'); } catch(err){ toast(err.message,true); }
 };
 
