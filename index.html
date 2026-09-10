@@ -22,6 +22,9 @@
   --rec:var(--green);--rec-soft:rgba(52,211,153,.14);
   --desp:var(--red);--desp-soft:rgba(248,113,113,.14);
   --warn:var(--amber);--warn-soft:rgba(251,191,36,.14);
+  /* Fundo de linha inteira: precisa ser bem mais fraco que o *-soft de pill,
+     senao a tabela de 14 colunas vira um bloco de cor. */
+  --rec-row:rgba(52,211,153,.055);--desp-row:rgba(248,113,113,.055);
 }
 [data-theme="light"]{
   /* No claro o coral puro fecha so 3.3:1 sobre branco; --accent vira o coral
@@ -32,6 +35,7 @@
   --accent:#c22f2f;--accent2:#b02a2a;
   --green:#16a34a;--red:#dc2626;--amber:#d97706;
   --rec-soft:rgba(22,163,74,.12);--desp-soft:rgba(220,38,38,.12);--warn-soft:rgba(217,119,6,.12);
+  --rec-row:rgba(22,163,74,.06);--desp-row:rgba(220,38,38,.06);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scrollbar-gutter:stable}
@@ -151,6 +155,25 @@ td.mes-atual{box-shadow:inset 0 2px 0 var(--accent)}
 #tbl-resumo th,#tbl-resumo td,#tbl-cotas th,#tbl-cotas td,#tbl-despesas th,#tbl-despesas td{padding:9px 7px}
 #tbl-resumo th:first-child,#tbl-resumo td:first-child,#tbl-cotas th:first-child,#tbl-cotas td:first-child,#tbl-despesas th:first-child,#tbl-despesas td:first-child{padding-left:14px}
 #tbl-resumo th:last-child,#tbl-resumo td:last-child,#tbl-cotas th:last-child,#tbl-cotas td:last-child,#tbl-despesas th:last-child,#tbl-despesas td:last-child{padding-right:14px;border-left:1px solid var(--border-ctrl)}
+/* ══ DEMONSTRATIVO: blocos ══
+   Receita, despesa e totalizador dividem a mesma tabela e a mesma coluna de
+   meses. A faixa na primeira celula e o fundo dizem de que bloco a linha e,
+   sem obrigar o leitor a decorar a ordem. Os fundos precisam vencer o
+   background da primeira coluna sticky, por isso o seletor com id. */
+#tbl-resumo tr.l-rec td{background:var(--rec-row)}
+#tbl-resumo tr.l-desp td{background:var(--desp-row)}
+#tbl-resumo tr.l-rec td:first-child{box-shadow:inset 3px 0 0 var(--green)}
+#tbl-resumo tr.l-desp td:first-child{box-shadow:inset 3px 0 0 var(--red)}
+#tbl-resumo tr.l-tot td{background:var(--card-deep);font-weight:800;border-top:1px solid var(--border-ctrl)}
+#tbl-resumo tr.l-tot-rec td:first-child{box-shadow:inset 3px 0 0 var(--green)}
+#tbl-resumo tr.l-tot-desp td:first-child{box-shadow:inset 3px 0 0 var(--red)}
+#tbl-resumo tr.l-saldo td{background:var(--card-deep);color:var(--muted)}
+#tbl-resumo tr.l-saldo td:first-child{box-shadow:inset 3px 0 0 var(--border-ctrl)}
+#tbl-resumo tr.l-forte td{color:var(--text);font-weight:800;border-top:1px solid var(--border-ctrl)}
+#tbl-resumo tr.l-forte td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
+.legenda{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:10px 14px 0;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
+.legenda i{display:inline-block;width:3px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.legenda .l-r i{background:var(--green)} .legenda .l-d i{background:var(--red)} .legenda .l-t i{background:var(--border-ctrl)}
 /* Valor diferente da cota cadastrada: nem "pago" nem "pendente" contam essa
    historia sozinhos, entao a celula ganha contorno de atencao. */
 td.dif{box-shadow:inset 0 0 0 1.5px var(--amber)}
@@ -334,6 +357,7 @@ td.check{text-align:center;width:80px}
     </div>
     <div class="card">
       <h2>Demonstrativo financeiro <span class="status edit-only">Saldo inicial do ano: <a href="#" id="saldo-ini">definir</a></span></h2>
+      <div class="legenda"><span class="l-r"><i></i>Receita</span><span class="l-d"><i></i>Despesa</span><span class="l-t"><i></i>Totalizador e saldo</span></div>
       <div class="scroll"><table id="tbl-resumo"></table></div>
     </div>
   </section>
@@ -457,7 +481,7 @@ td.check{text-align:center;width:80px}
 // ecossistema CDV — token e repo de dados exclusivos. Aqui so trafega o e-mail.
 const API = 'https://castanheiras-production.up.railway.app';
 const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
-const ROW_NO_MES = '1.2 - Cotas condominiais', ROW_ATRASO = '1.1 - Cotas recebidas em atraso';
+const ROW_NO_MES = 'Cotas condominiais', ROW_ATRASO = 'Cotas recebidas em atraso';
 // ==================================================
 
 const $ = s => document.querySelector(s);
@@ -736,18 +760,21 @@ function renderResumo(){
   const max = Math.max(1,...C.rec,...C.desp);
   $('#meses').innerHTML = MESES.map((m,i)=>`<div class="mes" title="${m}: receitas ${fmt(C.rec[i])} · despesas ${fmt(C.desp[i])}"><div class="vals"><b class="r${C.rec[i]?'':' zero'}">${fmtK(C.rec[i])}</b><b class="d${C.desp[i]?'':' zero'}">${fmtK(C.desp[i])}</b></div><div class="bar"><i class="r" style="height:${C.rec[i]/max*100}%"></i><i class="d" style="height:${C.desp[i]/max*100}%"></i></div><label>${m}</label></div>`).join('');
   const tot = a => a.reduce((s,v)=>s+(v||0),0);
+  // O quarto item e a classe da linha: e ela que pinta receita, despesa,
+  // totalizador e saldo. Vem declarada aqui e nao adivinhada por regex no
+  // rotulo, porque o rotulo das categorias de despesa e livre.
   const linhas = [
-    ['Saldo do mês anterior', C.saldoAnt.map(v=>v??0)],
-    [ROW_ATRASO, C.atraso, 'rec'], [ROW_NO_MES, C.noMes, 'rec'],
-    ['Total das receitas', C.rec, 'rec'],
-    ...D.categorias.map(c=>[c, C.despCat[c]||Array(12).fill(0), 'desp']),
-    ['Total das despesas', C.desp, 'desp'],
-    ['Resultado do mês', MESES.map((_,i)=>r2(C.rec[i]-C.desp[i]))],
-    ['Saldo atual', C.saldo.map(v=>v??0)],
+    ['Saldo do mês anterior', C.saldoAnt.map(v=>v??0), '', 'l-saldo'],
+    [ROW_ATRASO, C.atraso, 'rec', 'l-rec'], [ROW_NO_MES, C.noMes, 'rec', 'l-rec'],
+    ['Total das receitas', C.rec, 'rec', 'l-tot l-tot-rec'],
+    ...D.categorias.map(c=>[c, C.despCat[c]||Array(12).fill(0), 'desp', 'l-desp']),
+    ['Total das despesas', C.desp, 'desp', 'l-tot l-tot-desp'],
+    ['Resultado do mês', MESES.map((_,i)=>r2(C.rec[i]-C.desp[i])), '', 'l-tot l-forte'],
+    ['Saldo atual', C.saldo.map(v=>v??0), '', 'l-saldo l-forte'],
   ];
-  $('#tbl-resumo').innerHTML = `<thead><tr><th></th>${thMeses()}<th>Total</th></tr></thead><tbody>${linhas.map(([lab,vals,cls])=>{
+  $('#tbl-resumo').innerHTML = `<thead><tr><th></th>${thMeses()}<th>Total</th></tr></thead><tbody>${linhas.map(([lab,vals,cls,linha])=>{
     const total = /^Saldo/.test(lab) ? '' : fmtN(tot(vals));
-    return `<tr><td${/^Total|^Saldo atual/.test(lab)?' style="font-weight:600"':''}>${esc(lab)}</td>${tdVals(vals,cls)}<td><b>${total}</b></td></tr>`;}).join('')}</tbody>`;
+    return `<tr class="${linha}"><td>${esc(lab)}</td>${tdVals(vals,cls)}<td><b>${total}</b></td></tr>`;}).join('')}</tbody>`;
 }
 $('#saldo-ini').onclick = async e => {
   e.preventDefault();
