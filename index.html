@@ -384,6 +384,19 @@ td.check{text-align:center;width:80px}
   </section>
 
   <section id="tab-importar" hidden>
+    <div class="toolbar" style="margin-top:0">
+      <span class="status">Buscar direto na conta do condomínio</span>
+      <label class="status">Período <select id="inter-dias" class="inline">
+        <option value="7">últimos 7 dias</option>
+        <option value="15" selected>últimos 15 dias</option>
+        <option value="30">últimos 30 dias</option>
+        <option value="60">últimos 60 dias</option>
+        <option value="90">últimos 90 dias</option>
+      </select></label>
+      <button class="btn small" id="btn-inter">Buscar no Inter</button>
+      <span class="grow"></span>
+      <span class="status" id="inter-msg"></span>
+    </div>
     <label class="drop" id="drop">
       <input type="file" id="file" accept=".ofx,.csv,.txt,.qfx">
       <strong>Arraste o extrato aqui ou clique para escolher</strong><br>
@@ -1222,6 +1235,29 @@ drop.addEventListener('drop', e=>{ const f=e.dataTransfer.files[0]; if(f) lerArq
 $('#file').addEventListener('change', e=>{ if(e.target.files[0]) lerArquivo(e.target.files[0]); e.target.value=''; });
 function fillMesRef(){ const sel=$('#imp-mesref'); const cur=sel.value; sel.innerHTML=`<option value="">Mês do pagamento</option>`+MESES.map(m=>`<option value="${m}">${m}</option>`).join(''); sel.value=cur; sel.onchange=()=>{ IMP.forEach(l=>{ if(l.tipo==='receita'&&!l.mesRefManual) l.mesRef=sel.value||l.mesPag; }); renderImport(); }; }
 
+// A API do Inter exige mTLS, entao o navegador nao fala com o banco: quem
+// busca e o servico do condominio, que devolve as transacoes ja no mesmo
+// formato do parser de OFX. Daqui para frente o fluxo e identico ao do arquivo.
+async function buscarInter(){
+  const dias = $('#inter-dias').value || 15;
+  const btn = $('#btn-inter');
+  btn.disabled = true; $('#inter-msg').textContent = 'Consultando o banco…';
+  try {
+    const j = await api(`/inter/transacoes?email=${encodeURIComponent(getEmail())}&dias=${dias}&t=${Date.now()}`);
+    const trans = j.itens || [];
+    if(!trans.length){ $('#inter-msg').textContent = 'Nenhuma movimentação no período'; toast('Nenhuma movimentação no período'); return; }
+    FONTE_DESC = `Inter · ${fmtData(j.inicio)} a ${fmtData(j.fim)}`;
+    IMP = alocarMesRef(trans.map(classificar));
+    $('#imp-toolbar').hidden=false; $('#imp-card').hidden=false;
+    renderImport();
+    $('#inter-msg').textContent = `${trans.length} movimentações · ${FONTE_DESC}`;
+  } catch(e){
+    $('#inter-msg').textContent = e.message;
+    toast(e.message, true);
+  } finally { btn.disabled = false; }
+}
+$('#btn-inter').onclick = buscarInter;
+
 async function lerArquivo(file){
   const buf = await file.arrayBuffer();
   let txt = new TextDecoder('utf-8').decode(buf);
@@ -1328,6 +1364,14 @@ function classificar(t){
     const regra=D.regras.find(r=>r.chave&&d.includes(norm(r.chave)));
     if(regra){ l.destino=regra.categoria; l.motivo=`regra “${regra.chave}”`; } else l.motivo='sem regra — escolha a categoria';
   }
+  // O mesmo dinheiro importado pelo OFX e pela API tem ids diferentes, entao o
+  // teste por id nao pega. Duplicar lancamento corrompe o saldo em silencio;
+  // deixar de fora aparece na divergencia de cota. Na duvida, fica desmarcado
+  // e o motivo explica — reveja e marque de novo se for pagamento legitimo.
+  if(!l.jaLancado && D.lancamentos.some(x=>x.data===l.data && Math.abs(x.valor-l.valor)<0.01 && /receita/.test(x.tipo)===!!t.credito)){
+    l.incluir=false; l.duplicata=true;
+    l.motivo='possível duplicata — já existe lançamento igual nesse dia';
+  }
   return l;
 }
 // Quando um apto paga duas vezes no mesmo mes, quase sempre e porque um mes
@@ -1364,6 +1408,7 @@ let FILTRO_IMP = 'todos';
 // perdem no meio de 138 linhas se nada as diferenciar.
 function precisaAtencao(l){
   if(l.jaLancado) return false;
+  if(l.duplicata) return true;
   if(!l.destino) return true;
   if(!(l.valor > 0)) return true;
   if(l.tipo === 'receita' && !l.mesRef) return true;
@@ -1415,7 +1460,7 @@ $('#imp-filtros').onclick = e => {
   FILTRO_IMP = b.dataset.f; renderImport();
 };
 $('#btn-lancar').onclick=async()=>{
-  const novos=IMP.filter(l=>l.incluir&&l.destino).map(l=>({id:l.id,data:l.data,descricao:l.descricao,valor:l.valor,tipo:l.tipo,destino:l.destino,mesRef:l.tipo==='receita'?l.mesRef:l.mesPag,origem:'extrato'}));
+  const novos=IMP.filter(l=>l.incluir&&l.destino).map(l=>({id:l.id,data:l.data,descricao:l.descricao,valor:l.valor,tipo:l.tipo,destino:l.destino,mesRef:l.tipo==='receita'?l.mesRef:l.mesPag,origem:l.origem||'extrato'}));
   if(!novos.length) return;
   if(!confirm(`Lançar ${novos.length} transações?`)) return;
   $('#btn-lancar').disabled=true; $('#btn-lancar').textContent='Lançando…';
