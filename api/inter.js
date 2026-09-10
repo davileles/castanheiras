@@ -177,4 +177,49 @@ async function extrato(inicio, fim) {
   return { rota: rotaExtrato, inicio, fim, total: itens.length, itens };
 }
 
-module.exports = { configurado, token, descobrir, saldo, extrato, periodoPadrao, cacheInfo: () => ({ temToken: !!cache.token, expiraEm: cache.expira ? new Date(cache.expira).toISOString() : null, escopos: cache.escopos }) };
+// Mesma função de hash do front-end, para o id da transação sobreviver a
+// qualquer caminho: o `idTransacao` do Inter é estável e único, então importar
+// duas vezes o mesmo período nunca duplica lançamento.
+function hashCurto(s) {
+  let h = 0;
+  for (const ch of String(s)) h = (h * 31 + ch.charCodeAt(0)) | 0;
+  return 'I' + (h >>> 0).toString(36);
+}
+
+// Traduz a transação do Inter para o formato que a tela de importação já
+// consome — o mesmo que sai do parser de OFX. Assim a API vira só mais uma
+// fonte, sem tocar na classificação nem na conferência.
+function normalizar(t) {
+  const det = t.detalhes || {};
+  const credito = String(t.tipoOperacao || '').toUpperCase() === 'C';
+  const data = String(t.dataTransacao || t.dataInclusao || '').slice(0, 10);
+  const valor = Math.abs(Number(String(t.valor).replace(',', '.')) || 0);
+
+  // No crédito o nome do pagador é o que o classificador usa para achar o
+  // morador; no débito, a descrição é o que casa com as regras de categoria.
+  const nome = credito ? (det.nomePagador || t.descricao) : (t.descricao || det.nomeRecebedor);
+  const partes = [];
+  if (nome) partes.push(String(nome).trim());
+  const extra = String(det.descricaoPix || '').trim();
+  if (extra && !partes.join(' ').includes(extra)) partes.push(extra);
+
+  return {
+    id: hashCurto(t.idTransacao || (data + valor + (nome || ''))),
+    data,
+    descricao: partes.join(' — ') || String(t.titulo || 'Movimentação'),
+    valor,
+    credito,
+    origem: 'inter',
+    // Chave estável de identificação do pagador — bem melhor que o nome, que
+    // vem escrito de um jeito a cada mês. Ainda não é usada na classificação.
+    cpf: String((credito ? det.cpfCnpjPagador : det.cpfCnpjRecebedor) || '').replace(/\D/g, '') || null,
+    tipoTransacao: t.tipoTransacao || null
+  };
+}
+
+async function transacoes(inicio, fim) {
+  const r = await extrato(inicio, fim);
+  return { ...r, itens: r.itens.map(normalizar).filter(t => t.data && t.valor > 0) };
+}
+
+module.exports = { configurado, token, descobrir, saldo, extrato, transacoes, normalizar, periodoPadrao, cacheInfo: () => ({ temToken: !!cache.token, expiraEm: cache.expira ? new Date(cache.expira).toISOString() : null, escopos: cache.escopos }) };
