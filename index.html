@@ -437,9 +437,10 @@ td.check{text-align:center;width:80px}
 
 <script>
 // ================== CONFIGURAÇÃO ==================
-// O navegador nao fala mais com a API do GitHub: quem guarda o token e grava
-// o arquivo e o proxy CDV (painel-cdv/index.js). Aqui so trafega o e-mail.
-const API = 'https://cdv-proxy-production.up.railway.app';
+// O navegador nao fala com a API do GitHub: quem guarda o token e grava o
+// arquivo e o servico proprio do condominio (castanheiras/api), isolado do
+// ecossistema CDV — token e repo de dados exclusivos. Aqui so trafega o e-mail.
+const API = 'https://castanheiras-production.up.railway.app';
 const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
 const ROW_NO_MES = '1.2 - Cotas condominiais', ROW_ATRASO = '1.1 - Cotas recebidas em atraso';
 // ==================================================
