@@ -120,6 +120,28 @@ td.pago{background:var(--rec-soft);color:var(--green)}
 .tag.aberto{background:var(--desp-soft);color:var(--red)}
 .tag.menos{background:var(--warn-soft);color:var(--amber)}
 .tag.mais{background:var(--rec-soft);color:var(--green)}
+.tag.pend{background:var(--warn-soft);color:var(--amber)}
+.tag.quit{background:var(--rec-soft);color:var(--green)}
+
+/* ══ REEMBOLSOS ══ */
+nav button .badge{display:inline-block;margin-left:6px;background:var(--warn-soft);color:var(--amber);font-size:9px;font-weight:800;padding:1px 6px;border-radius:999px;vertical-align:1px}
+.form-grid{display:grid;grid-template-columns:140px 1.1fr 1.6fr 1.2fr 120px auto;gap:10px;padding:15px 18px;align-items:end}
+.form-grid label{display:block;font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px}
+.form-grid .btn{white-space:nowrap}
+.filtros.dentro{padding:12px 18px 0;margin:0}
+@media(max-width:900px){.form-grid{grid-template-columns:1fr 1fr}.form-grid .campo-largo{grid-column:1/-1}}
+
+/* ══ MODAL ══ */
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px;z-index:180}
+.modal .box{background:var(--surface);border:1px solid var(--border);border-radius:14px;width:100%;max-width:540px;max-height:86vh;overflow:auto;box-shadow:0 16px 48px rgba(0,0,0,.45)}
+.modal h2{padding:15px 18px;font-size:13px;font-weight:700;border-bottom:1px solid var(--border)}
+.modal .mbody{padding:16px 18px;display:flex;flex-direction:column;gap:12px}
+.modal .mfoot{padding:14px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px}
+.mlab{display:block;font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:6px}
+.mopt{background:var(--card-deep);border:1px solid var(--border);border-radius:10px;padding:10px 12px}
+.mopt label{display:flex;gap:9px;align-items:flex-start;font-size:12.5px;font-weight:600;cursor:pointer}
+.mopt input[type=radio]{margin-top:2px;accent-color:var(--accent);flex-shrink:0}
+.mresumo{background:var(--card-deep);border:1px solid var(--border);border-radius:10px;padding:11px 13px;font-size:12.5px;font-weight:600;line-height:1.6}
 td.mes-atual{box-shadow:inset 0 2px 0 var(--accent)}
 /* Tabelas de 12 meses + coluna Total: celulas compactas para caber na tela. */
 #tbl-resumo,#tbl-cotas,#tbl-despesas{font-size:12px}
@@ -250,6 +272,7 @@ body.ro .edit-only{display:none!important}
         <button role="tab" data-tab="resumo" aria-selected="true">Resumo</button>
         <button role="tab" data-tab="cotas">Cotas</button>
         <button role="tab" data-tab="despesas">Despesas</button>
+        <button role="tab" data-tab="reembolsos">Reembolsos <span class="badge" id="badge-reemb" hidden></span></button>
         <button role="tab" data-tab="lancamentos">Lançamentos</button>
         <button role="tab" data-tab="importar" class="edit-only">Importar extrato</button>
         <button role="tab" data-tab="cadastros" class="edit-only">Moradores e regras</button>
@@ -290,6 +313,10 @@ body.ro .edit-only{display:none!important}
       <h2>Divergências de cota <span class="status" id="diverg-status"></span></h2>
       <div class="scroll"><table id="tbl-diverg"></table></div>
     </div>
+    <div class="card" id="card-reemb" hidden>
+      <h2>Pagamentos a restituir <span class="status" id="reemb-status"></span></h2>
+      <div class="scroll"><table id="tbl-reemb-resumo"></table></div>
+    </div>
     <div class="card">
       <h2>Demonstrativo financeiro <span class="status edit-only">Saldo inicial do ano: <a href="#" id="saldo-ini">definir</a></span></h2>
       <div class="scroll"><table id="tbl-resumo"></table></div>
@@ -307,6 +334,30 @@ body.ro .edit-only{display:none!important}
     <div class="card">
       <h2>Despesas por categoria <span class="status edit-only">Clique numa célula para registrar uma despesa</span></h2>
       <div class="scroll"><table id="tbl-despesas"></table></div>
+    </div>
+  </section>
+
+  <section id="tab-reembolsos" hidden>
+    <div class="card edit-only">
+      <h2>Registrar pagamento feito por fora da conta</h2>
+      <div class="form-grid">
+        <div><label>Data do pagamento</label><input type="date" id="rb-data"></div>
+        <div><label>Quem pagou</label><select id="rb-pessoa"></select><input type="text" id="rb-nome" placeholder="Nome de quem pagou" style="margin-top:8px" hidden></div>
+        <div class="campo-largo"><label>O que foi pago</label><input type="text" id="rb-desc" placeholder="Ex.: 2 lâmpadas LED do hall"></div>
+        <div><label>Categoria da despesa</label><select id="rb-cat"></select></div>
+        <div><label>Valor (R$)</label><input type="number" step="0.01" id="rb-valor" placeholder="0,00"></div>
+        <div><button class="btn" id="rb-add">Registrar</button></div>
+      </div>
+      <div class="result status">A pendência não entra no demonstrativo enquanto o dinheiro não sair da conta do condomínio — as contas aqui são o espelho do extrato. Ao restituir, a despesa é lançada na data da saída.</div>
+    </div>
+    <div class="card">
+      <h2>Pendências <span class="h2-dir"><span class="status" id="rb-status"></span></span></h2>
+      <div class="filtros dentro" id="rb-filtros">
+        <button class="f active" data-f="aberto">Em aberto</button>
+        <button class="f" data-f="quitado">Restituídos</button>
+        <button class="f" data-f="todos">Todos</button>
+      </div>
+      <div class="scroll"><table id="tbl-reemb"></table></div>
     </div>
   </section>
 
@@ -356,6 +407,8 @@ body.ro .edit-only{display:none!important}
   </section>
 </main>
 </div>
+
+<div class="modal" id="rb-modal" hidden></div>
 
 <div id="toast" role="status"></div>
 
@@ -430,6 +483,10 @@ function ordenar(d){
   if(Array.isArray(d.moradores))  d.moradores.sort((a,b)=> ordCmp.compare(a.apto||'', b.apto||''));
   if(Array.isArray(d.categorias)) d.categorias.sort((a,b)=> ordCmp.compare(a||'', b||''));
   if(Array.isArray(d.regras))     d.regras.sort((a,b)=> ordCmp.compare(a.categoria||'', b.categoria||'') || ordCmp.compare(a.chave||'', b.chave||''));
+  // Arquivo antigo nao tem a lista de reembolsos: cria vazia para o resto do
+  // codigo nunca precisar checar existencia.
+  if(!Array.isArray(d.reembolsos)) d.reembolsos = [];
+  d.reembolsos.sort((a,b)=> String(a.data||'').localeCompare(String(b.data||'')));
   return d;
 }
 
@@ -488,7 +545,10 @@ $('#btn-limpar-lanc').onclick = async ()=>{
   if(String(prompt('Para confirmar, digite EXCLUIR:')||'').trim().toUpperCase() !== 'EXCLUIR'){ toast('Exclusão cancelada'); return; }
   try {
     EDIT_ID = null; EDIT_BUF = null;
-    await salvar(d=>{ d.lancamentos = []; }, `Exclui todos os lançamentos (${total})`);
+    await salvar(d=>{
+      d.lancamentos = [];
+      (d.reembolsos||[]).forEach(rb=>{ rb.status='aberto'; delete rb.quitadoEm; delete rb.lancamentoId; });
+    }, `Exclui todos os lançamentos (${total})`);
     toast(`${total} lançamentos excluídos`);
   } catch(e){ toast(e.message, true); }
 };
@@ -551,7 +611,7 @@ function calcGeral(){
 // ---------- Render ----------
 function renderTudo(){
   $('#subtitulo').textContent = `Contas do condomínio · ${ANO}`;
-  renderResumo(); renderDivergencias(); renderCotas(); renderDespesas(); renderLanc(); renderCadastros(); fillMesRef();
+  renderResumo(); renderDivergencias(); renderResumoReemb(); renderCotas(); renderDespesas(); renderReembolsos(); renderLanc(); renderCadastros(); fillMesRef();
 }
 const thMeses = () => MESES.map((m,i)=>`<th class="${i===hoje.getMonth()&&ANO===hoje.getFullYear()?'mes-atual':''}">${m}</th>`).join('');
 const tdVals = (vals, cls) => vals.map(v=>{ v=v||0; return `<td class="${v===0?'zero':(cls||(v<0?'neg':''))}">${v===0?'—':fmtN(v)}</td>`; }).join('');
@@ -765,8 +825,14 @@ function renderLanc(){
 
     if(btn.classList.contains('x')){
       const l = D.lancamentos.find(x=>x.id===id);
-      if(!confirm(`Excluir "${l.descricao}" de ${fmtN(l.valor)}?`)) return;
-      try { await salvar(d=>{ d.lancamentos = d.lancamentos.filter(x=>x.id!==id); }, `Exclui lançamento ${id}`); toast('Lançamento excluído'); } catch(err){ toast(err.message,true); }
+      // Se este lancamento quitava um reembolso, a pendencia tem de voltar a
+      // existir — senao o morador fica sem a restituicao e sem o registro dela.
+      const lig = rbLista().find(x=>x.lancamentoId===id);
+      if(!confirm(`Excluir "${l.descricao}" de ${fmtN(l.valor)}?` + (lig ? '\n\nA pendência de reembolso vinculada volta para "em aberto".' : ''))) return;
+      try { await salvar(d=>{
+        d.lancamentos = d.lancamentos.filter(x=>x.id!==id);
+        (d.reembolsos||[]).forEach(rb=>{ if(rb.lancamentoId===id){ rb.status='aberto'; delete rb.quitadoEm; delete rb.lancamentoId; } });
+      }, `Exclui lançamento ${id}`); toast('Lançamento excluído'); } catch(err){ toast(err.message,true); }
     }
   };
 }
@@ -800,6 +866,245 @@ function lanc(data, descricao, valor, tipo, destino, mesRef){
   // estornos são gravados como valores negativos do tipo base
   const neg = tipo.startsWith('estorno-'); const t = neg ? tipo.slice(8) : tipo;
   return { id: hash(data+descricao+valor+tipo+Date.now()), data, descricao, valor: neg ? -valor : valor, tipo: t, destino, mesRef: mesRef||MESES[+data.slice(5,7)-1], origem:'manual' };
+}
+
+// ---------- Reembolsos ----------
+// Alguem paga do proprio bolso (lampada, gas, chaveiro) e o condominio precisa
+// devolver. O app inteiro e regime de caixa — espelho do extrato — entao o
+// pagamento por fora NAO vira despesa aqui: vira pendencia. A despesa nasce
+// quando o dinheiro sai da conta, ou vinculada ao debito que veio no extrato.
+// Assim o mesmo gasto nunca e contado duas vezes.
+const RB_OUTRO = '__outro';
+let RB_FILTRO = 'aberto';
+const rbLista = () => { if(!Array.isArray(D.reembolsos)) D.reembolsos = []; return D.reembolsos; };
+const rbAberto = r => r.status !== 'quitado';
+const hojeISO = () => new Date(hoje.getTime() - hoje.getTimezoneOffset()*60000).toISOString().slice(0,10);
+// O nome sai sempre do cadastro quando o pagador e morador: se o apto mudar de
+// dono, a pendencia antiga continua apontando para a pessoa certa do cadastro.
+function rbPessoa(r){
+  const m = r.apto ? D.moradores.find(x=>x.apto===r.apto) : null;
+  if(m) return `Apto ${m.apto} · ${m.nome}`;
+  if(r.apto) return `Apto ${r.apto}`;
+  return r.pessoa || '—';
+}
+
+function fillRb(){
+  const p = $('#rb-pessoa'), c = $('#rb-cat');
+  const vp = p.value, vc = c.value;
+  p.innerHTML = `<option value="">Escolher…</option>`
+    + D.moradores.map(m=>`<option value="${esc(m.apto)}">${esc(m.apto)} · ${esc(m.nome)}</option>`).join('')
+    + `<option value="${RB_OUTRO}">Outra pessoa…</option>`;
+  c.innerHTML = `<option value="">Escolher…</option>` + D.categorias.map(x=>`<option>${esc(x)}</option>`).join('');
+  p.value = vp; c.value = vc;
+  $('#rb-nome').hidden = p.value !== RB_OUTRO;
+  if(!$('#rb-data').value) $('#rb-data').value = hojeISO();
+}
+$('#rb-pessoa').onchange = e => { $('#rb-nome').hidden = e.target.value !== RB_OUTRO; if(!$('#rb-nome').hidden) $('#rb-nome').focus(); };
+$('#rb-filtros').onclick = e => {
+  const b = e.target.closest('button[data-f]'); if(!b) return;
+  RB_FILTRO = b.dataset.f;
+  [...$('#rb-filtros').querySelectorAll('.f')].forEach(x=>x.classList.toggle('active', x===b));
+  renderReembolsos();
+};
+
+// A pendencia nao tem ano: uma lampada comprada em dezembro e restituida em
+// janeiro precisa continuar visivel. Por isso a lista ignora o seletor de ano.
+function renderReembolsos(){
+  fillRb();
+  const L = rbLista();
+  const abertos = L.filter(rbAberto);
+  const total = r2(abertos.reduce((s,x)=>s+(+x.valor||0),0));
+  const badge = $('#badge-reemb');
+  badge.hidden = !abertos.length; badge.textContent = abertos.length;
+  $('#rb-status').textContent = abertos.length
+    ? `${abertos.length} em aberto · ${fmt(total)} a restituir`
+    : (L.length ? 'Nenhuma pendência em aberto' : 'Nenhum registro');
+
+  const lista = (RB_FILTRO==='aberto' ? abertos : RB_FILTRO==='quitado' ? L.filter(x=>!rbAberto(x)) : L.slice())
+    .sort((a,b)=> String(b.data||'').localeCompare(String(a.data||'')));
+
+  if(!lista.length){
+    $('#tbl-reemb').innerHTML = `<tr><td class="empty" style="text-align:center">${RB_FILTRO==='aberto'?'Nada a restituir no momento.':'Nenhum registro.'}</td></tr>`;
+    $('#tbl-reemb').onclick = null;
+    return;
+  }
+  $('#tbl-reemb').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left">Quem pagou</th><th style="text-align:left">O que foi pago</th><th style="text-align:left">Categoria</th><th>Valor</th><th>Situação</th><th class="edit-only"></th></tr></thead>
+  <tbody>${lista.map(r=>{
+    const ab = rbAberto(r);
+    return `<tr data-id="${esc(r.id)}">
+      <td>${fmtData(r.data)}</td>
+      <td style="text-align:left">${esc(rbPessoa(r))}</td>
+      <td class="desc">${esc(r.descricao)}</td>
+      <td style="text-align:left">${esc(r.categoria||'—')}</td>
+      <td class="desp">${fmtN(r.valor)}</td>
+      <td>${ab ? `<span class="tag pend">Em aberto</span>` : `<span class="tag quit">Restituído ${fmtData(r.quitadoEm)}</span>`}</td>
+      <td class="acao edit-only">${ab
+        ? `<button class="btn secondary small" data-quitar="1">Restituir</button> <button class="x" data-del="1" title="Excluir">×</button>`
+        : `<button class="btn secondary small" data-reabrir="1">Reabrir</button>`}</td>
+    </tr>`;}).join('')}</tbody>
+  <tfoot><tr><td colspan="4">Total ${RB_FILTRO==='aberto'?'em aberto':'listado'}</td><td class="desp">${fmtN(r2(lista.reduce((s,x)=>s+(+x.valor||0),0)))}</td><td colspan="2"></td></tr></tfoot>`;
+
+  $('#tbl-reemb').onclick = async e => {
+    const btn = e.target.closest('button'); if(!btn || !CAN_WRITE) return;
+    const id = btn.closest('tr').dataset.id;
+    if(btn.dataset.quitar) return abrirQuitacao(id);
+    if(btn.dataset.reabrir) return rbReabrir(id);
+    if(btn.dataset.del){
+      const r = rbLista().find(x=>x.id===id); if(!r) return;
+      if(!confirm(`Excluir a pendência "${r.descricao}" de ${fmtN(r.valor)}?`)) return;
+      try { await salvar(d=>{ d.reembolsos = (d.reembolsos||[]).filter(x=>x.id!==id); }, `Exclui reembolso ${id}`); toast('Pendência excluída'); }
+      catch(err){ toast(err.message, true); }
+    }
+  };
+}
+
+// Espelho resumido no Resumo: quem abre o app precisa ver a divida sem ter de
+// lembrar de visitar a aba.
+function renderResumoReemb(){
+  const abertos = rbLista().filter(rbAberto);
+  $('#card-reemb').hidden = !abertos.length;
+  if(!abertos.length) return;
+  const total = r2(abertos.reduce((s,x)=>s+(+x.valor||0),0));
+  const G = calcGeral();
+  $('#reemb-status').textContent = `${abertos.length} pendência${abertos.length>1?'s':''} · ${fmt(total)}`
+    + (G.ok ? ` · saldo após restituir ${fmt(r2(G.saldo - total))}` : '');
+  const L = abertos.slice().sort((a,b)=> String(a.data||'').localeCompare(String(b.data||'')));
+  $('#tbl-reemb-resumo').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left">Quem pagou</th><th style="text-align:left">O que foi pago</th><th>Valor</th></tr></thead>
+  <tbody>${L.map(r=>`<tr>
+    <td>${fmtData(r.data)}</td>
+    <td style="text-align:left">${esc(rbPessoa(r))}</td>
+    <td class="desc">${esc(r.descricao)}</td>
+    <td class="desp">${fmtN(r.valor)}</td>
+  </tr>`).join('')}</tbody>
+  <tfoot><tr><td colspan="3">Total a restituir</td><td class="desp">${fmtN(total)}</td></tr></tfoot>`;
+}
+
+$('#rb-add').onclick = async ()=>{
+  if(!CAN_WRITE) return;
+  const data = $('#rb-data').value;
+  const sel = $('#rb-pessoa').value, nome = $('#rb-nome').value.trim();
+  const desc = $('#rb-desc').value.trim(), cat = $('#rb-cat').value;
+  const valor = r2(Math.abs(Number($('#rb-valor').value)||0));
+  if(!data){ toast('Informe a data do pagamento', true); return; }
+  if(!sel){ toast('Informe quem pagou', true); return; }
+  if(sel===RB_OUTRO && !nome){ toast('Informe o nome de quem pagou', true); return; }
+  if(!desc){ toast('Descreva o que foi pago', true); return; }
+  if(!cat){ toast('Escolha a categoria da despesa', true); return; }
+  if(!(valor > 0)){ toast('Valor deve ser maior que zero', true); return; }
+  const morador = D.moradores.find(m=>m.apto===sel);
+  const novo = {
+    id: hash('RB' + data + desc + valor + Date.now()),
+    data,
+    apto: sel===RB_OUTRO ? '' : sel,
+    pessoa: sel===RB_OUTRO ? nome : ((morador||{}).nome || ''),
+    descricao: desc, categoria: cat, valor,
+    status: 'aberto',
+    criadoEm: new Date().toISOString(), criadoPor: getEmail()
+  };
+  try {
+    await salvar(d=>{ if(!Array.isArray(d.reembolsos)) d.reembolsos = []; d.reembolsos.push(novo); },
+      `Registra reembolso a ${novo.pessoa || novo.apto} (${fmtN(valor)})`);
+    $('#rb-desc').value=''; $('#rb-valor').value=''; $('#rb-nome').value='';
+    toast('Pendência registrada');
+  } catch(e){ toast(e.message, true); }
+};
+
+// ---------- Quitação ----------
+function fecharModal(){ const m = $('#rb-modal'); m.hidden = true; m.innerHTML = ''; }
+
+function abrirQuitacao(id){
+  const r = rbLista().find(x=>x.id===id); if(!r) return;
+  // Candidatos a vinculo: despesas ja no extrato, a partir da data do
+  // pagamento, que nenhuma outra pendencia esteja usando. Valor igual sobe.
+  const usados = new Set(rbLista().filter(x=>x.lancamentoId).map(x=>x.lancamentoId));
+  const igual = l => Math.abs((+l.valor||0) - (+r.valor||0)) < 0.01;
+  const cand = D.lancamentos
+    .filter(l => l.tipo==='despesa' && (+l.valor||0) > 0 && !usados.has(l.id) && String(l.data) >= String(r.data))
+    .sort((a,b)=> (igual(b)?1:0) - (igual(a)?1:0) || String(b.data).localeCompare(String(a.data)))
+    .slice(0, 150);
+  const opts = cand.map(l=>`<option value="${esc(l.id)}">${fmtData(l.data)} · ${esc(String(l.descricao||'').slice(0,55))} · ${fmtN(l.valor)}${igual(l)?' ✓ mesmo valor':''}</option>`).join('');
+
+  $('#rb-modal').innerHTML = `<div class="box">
+    <h2>Registrar restituição</h2>
+    <div class="mbody">
+      <div class="mresumo">${esc(rbPessoa(r))}<br>${esc(r.descricao)} · <b>${fmt(r.valor)}</b><br><span class="status">Pago em ${fmtData(r.data)} · ${esc(r.categoria||'—')}</span></div>
+      <div>
+        <span class="mlab">Como o dinheiro saiu da conta do condomínio?</span>
+        <div class="mopt" style="margin-bottom:8px"><label><input type="radio" name="rbmodo" value="novo" checked> Criar o lançamento de despesa agora</label></div>
+        <div class="mopt"><label><input type="radio" name="rbmodo" value="link" ${cand.length?'':'disabled'}> Vincular a um débito que já veio no extrato${cand.length?'':' <span class="status">(nenhum disponível)</span>'}</label></div>
+      </div>
+      <div id="rb-m-novo"><span class="mlab">Data da saída</span><input type="date" id="rb-m-data" value="${hojeISO()}"></div>
+      <div id="rb-m-link" hidden><span class="mlab">Lançamento no extrato</span><select id="rb-m-lanc">${opts}</select></div>
+    </div>
+    <div class="mfoot">
+      <button class="btn secondary small" id="rb-m-cancel">Cancelar</button>
+      <button class="btn small" id="rb-m-ok">Confirmar restituição</button>
+    </div>
+  </div>`;
+  $('#rb-modal').hidden = false;
+
+  const modo = () => $('#rb-modal').querySelector('input[name=rbmodo]:checked').value;
+  $('#rb-modal').querySelectorAll('input[name=rbmodo]').forEach(el=>{
+    el.onchange = ()=>{ const m = modo(); $('#rb-m-novo').hidden = m!=='novo'; $('#rb-m-link').hidden = m!=='link'; };
+  });
+  $('#rb-m-cancel').onclick = fecharModal;
+  $('#rb-modal').onclick = e => { if(e.target === $('#rb-modal')) fecharModal(); };
+
+  $('#rb-m-ok').onclick = async ()=>{
+    const m = modo();
+    let dataQ = '', linkId = '';
+    if(m === 'link'){
+      linkId = $('#rb-m-lanc').value;
+      const l = D.lancamentos.find(x=>x.id===linkId);
+      if(!l){ toast('Escolha o lançamento', true); return; }
+      dataQ = l.data;
+    } else {
+      dataQ = $('#rb-m-data').value;
+      if(!dataQ){ toast('Informe a data da saída', true); return; }
+      if(dataQ < r.data && !confirm('A data da restituição é anterior ao pagamento. Confirmar mesmo assim?')) return;
+    }
+    const desc = `Restituição a ${rbPessoa(r)} — ${r.descricao}`;
+    const valor = r2(Math.abs(+r.valor||0)), cat = r.categoria;
+    fecharModal();
+    try {
+      await salvar(d=>{
+        if(!Array.isArray(d.reembolsos)) d.reembolsos = [];
+        const alvo = d.reembolsos.find(x=>x.id===id);
+        if(!alvo) throw new Error('Pendência não encontrada — recarregue a página');
+        if(alvo.status === 'quitado') throw new Error('Esta pendência já foi restituída em outra aba');
+        let lid = linkId;
+        if(!lid){
+          const nl = lanc(dataQ, desc, valor, 'despesa', cat, MESES[+dataQ.slice(5,7)-1]);
+          nl.origem = 'reembolso'; nl.reembolsoId = id;
+          d.lancamentos.push(nl);
+          lid = nl.id;
+        }
+        alvo.status = 'quitado'; alvo.quitadoEm = dataQ; alvo.lancamentoId = lid;
+      }, `Restitui ${fmtN(valor)} a ${rbPessoa(r)}`);
+      toast('Restituição registrada');
+    } catch(e){ toast(e.message, true); }
+  };
+}
+
+// Reabrir desfaz a quitacao. Se o lancamento tinha nascido daqui, ele vai
+// junto; se era um debito do extrato, so o vinculo se desfaz — apagar o
+// extrato seria mentir sobre o que aconteceu na conta.
+async function rbReabrir(id){
+  const r = rbLista().find(x=>x.id===id); if(!r) return;
+  const l = r.lancamentoId ? D.lancamentos.find(x=>x.id===r.lancamentoId) : null;
+  const criado = !!(l && l.origem === 'reembolso');
+  const msg = criado
+    ? `Reabrir esta pendência e excluir o lançamento de ${fmtN(l.valor)} criado por ela?`
+    : 'Reabrir esta pendência? O lançamento do extrato permanece nas contas.';
+  if(!confirm(msg)) return;
+  try {
+    await salvar(d=>{
+      const alvo = (d.reembolsos||[]).find(x=>x.id===id); if(!alvo) return;
+      if(criado) d.lancamentos = d.lancamentos.filter(x=>x.id!==alvo.lancamentoId);
+      alvo.status = 'aberto'; delete alvo.quitadoEm; delete alvo.lancamentoId;
+    }, `Reabre reembolso ${id}`);
+    toast('Pendência reaberta');
+  } catch(e){ toast(e.message, true); }
 }
 
 // ---------- Importação ----------
