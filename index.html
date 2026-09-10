@@ -392,7 +392,9 @@ td.check{text-align:center;width:80px}
         <option value="30">últimos 30 dias</option>
         <option value="60">últimos 60 dias</option>
         <option value="90">últimos 90 dias</option>
+        <option value="">a partir de uma data 🛫</option>
       </select></label>
+      <label class="status" id="inter-desde-wrap" hidden>🛫 <input type="date" id="inter-desde" class="inline" style="width:auto"></label>
       <button class="btn small" id="btn-inter">Buscar no Inter</button>
       <span class="grow"></span>
       <span class="status" id="inter-msg"></span>
@@ -1239,24 +1241,36 @@ function fillMesRef(){ const sel=$('#imp-mesref'); const cur=sel.value; sel.inne
 // busca e o servico do condominio, que devolve as transacoes ja no mesmo
 // formato do parser de OFX. Daqui para frente o fluxo e identico ao do arquivo.
 async function buscarInter(){
-  const dias = $('#inter-dias').value || 15;
+  const dias = $('#inter-dias').value;
+  const desde = $('#inter-desde').value;
+  if(!dias && !desde){ toast('Informe a data inicial', true); return; }
   const btn = $('#btn-inter');
-  btn.disabled = true; $('#inter-msg').textContent = 'Consultando o banco…';
+  // O Inter limita cada consulta a 89 dias e recusa chamadas coladas, entao o
+  // servico fatia o periodo e espera entre as janelas. Um ano leva ~20s.
+  const longo = !dias || Number(dias) > 89;
+  btn.disabled = true;
+  $('#inter-msg').textContent = longo ? 'Consultando o banco por janelas — pode levar alguns segundos…' : 'Consultando o banco…';
   try {
-    const j = await api(`/inter/transacoes?email=${encodeURIComponent(getEmail())}&dias=${dias}&t=${Date.now()}`);
+    const filtro = dias ? `dias=${dias}` : `inicio=${desde}&fim=${hojeISO()}`;
+    const j = await api(`/inter/transacoes?email=${encodeURIComponent(getEmail())}&${filtro}&t=${Date.now()}`);
     const trans = j.itens || [];
     if(!trans.length){ $('#inter-msg').textContent = 'Nenhuma movimentação no período'; toast('Nenhuma movimentação no período'); return; }
     FONTE_DESC = `Inter · ${fmtData(j.inicio)} a ${fmtData(j.fim)}`;
     IMP = alocarMesRef(trans.map(classificar));
     $('#imp-toolbar').hidden=false; $('#imp-card').hidden=false;
     renderImport();
-    $('#inter-msg').textContent = `${trans.length} movimentações · ${FONTE_DESC}`;
+    $('#inter-msg').textContent = `${trans.length} movimentações · ${FONTE_DESC}` + (j.janelas > 1 ? ` · ${j.janelas} janelas` : '');
   } catch(e){
     $('#inter-msg').textContent = e.message;
     toast(e.message, true);
   } finally { btn.disabled = false; }
 }
 $('#btn-inter').onclick = buscarInter;
+$('#inter-dias').onchange = e => {
+  const porData = !e.target.value;
+  $('#inter-desde-wrap').hidden = !porData;
+  if(porData && !$('#inter-desde').value) $('#inter-desde').value = hojeISO().slice(0,4) + '-01-01';
+};
 
 async function lerArquivo(file){
   const buf = await file.arrayBuffer();
