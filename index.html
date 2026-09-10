@@ -22,9 +22,6 @@
   --rec:var(--green);--rec-soft:rgba(52,211,153,.14);
   --desp:var(--red);--desp-soft:rgba(248,113,113,.14);
   --warn:var(--amber);--warn-soft:rgba(251,191,36,.14);
-  /* Fundo de linha inteira: precisa ser bem mais fraco que o *-soft de pill,
-     senao a tabela de 14 colunas vira um bloco de cor. */
-  --rec-row:rgba(52,211,153,.055);--desp-row:rgba(248,113,113,.055);
 }
 [data-theme="light"]{
   /* No claro o coral puro fecha so 3.3:1 sobre branco; --accent vira o coral
@@ -35,7 +32,6 @@
   --accent:#c22f2f;--accent2:#b02a2a;
   --green:#16a34a;--red:#dc2626;--amber:#d97706;
   --rec-soft:rgba(22,163,74,.12);--desp-soft:rgba(220,38,38,.12);--warn-soft:rgba(217,119,6,.12);
-  --rec-row:rgba(22,163,74,.06);--desp-row:rgba(220,38,38,.06);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scrollbar-gutter:stable}
@@ -155,25 +151,6 @@ td.mes-atual{box-shadow:inset 0 2px 0 var(--accent)}
 #tbl-resumo th,#tbl-resumo td,#tbl-cotas th,#tbl-cotas td,#tbl-despesas th,#tbl-despesas td{padding:9px 7px}
 #tbl-resumo th:first-child,#tbl-resumo td:first-child,#tbl-cotas th:first-child,#tbl-cotas td:first-child,#tbl-despesas th:first-child,#tbl-despesas td:first-child{padding-left:14px}
 #tbl-resumo th:last-child,#tbl-resumo td:last-child,#tbl-cotas th:last-child,#tbl-cotas td:last-child,#tbl-despesas th:last-child,#tbl-despesas td:last-child{padding-right:14px;border-left:1px solid var(--border-ctrl)}
-/* ══ DEMONSTRATIVO: blocos ══
-   Receita, despesa e totalizador dividem a mesma tabela e a mesma coluna de
-   meses. A faixa na primeira celula e o fundo dizem de que bloco a linha e,
-   sem obrigar o leitor a decorar a ordem. Os fundos precisam vencer o
-   background da primeira coluna sticky, por isso o seletor com id. */
-#tbl-resumo tr.l-rec td{background:var(--rec-row)}
-#tbl-resumo tr.l-desp td{background:var(--desp-row)}
-#tbl-resumo tr.l-rec td:first-child{box-shadow:inset 3px 0 0 var(--green)}
-#tbl-resumo tr.l-desp td:first-child{box-shadow:inset 3px 0 0 var(--red)}
-#tbl-resumo tr.l-tot td{background:var(--card-deep);font-weight:800;border-top:1px solid var(--border-ctrl)}
-#tbl-resumo tr.l-tot-rec td:first-child{box-shadow:inset 3px 0 0 var(--green)}
-#tbl-resumo tr.l-tot-desp td:first-child{box-shadow:inset 3px 0 0 var(--red)}
-#tbl-resumo tr.l-saldo td{background:var(--card-deep);color:var(--muted)}
-#tbl-resumo tr.l-saldo td:first-child{box-shadow:inset 3px 0 0 var(--border-ctrl)}
-#tbl-resumo tr.l-forte td{color:var(--text);font-weight:800;border-top:1px solid var(--border-ctrl)}
-#tbl-resumo tr.l-forte td:first-child{box-shadow:inset 3px 0 0 var(--accent)}
-.legenda{display:flex;gap:14px;flex-wrap:wrap;align-items:center;padding:10px 14px 0;font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px}
-.legenda i{display:inline-block;width:3px;height:11px;border-radius:2px;margin-right:6px;vertical-align:-1px}
-.legenda .l-r i{background:var(--green)} .legenda .l-d i{background:var(--red)} .legenda .l-t i{background:var(--border-ctrl)}
 /* Valor diferente da cota cadastrada: nem "pago" nem "pendente" contam essa
    historia sozinhos, entao a celula ganha contorno de atencao. */
 td.dif{box-shadow:inset 0 0 0 1.5px var(--amber)}
@@ -357,7 +334,6 @@ td.check{text-align:center;width:80px}
     </div>
     <div class="card">
       <h2>Demonstrativo financeiro <span class="status edit-only">Saldo inicial do ano: <a href="#" id="saldo-ini">definir</a></span></h2>
-      <div class="legenda"><span class="l-r"><i></i>Receita</span><span class="l-d"><i></i>Despesa</span><span class="l-t"><i></i>Totalizador e saldo</span></div>
       <div class="scroll"><table id="tbl-resumo"></table></div>
     </div>
   </section>
@@ -411,14 +387,16 @@ td.check{text-align:center;width:80px}
     <div class="toolbar" style="margin-top:0">
       <span class="status">Buscar direto na conta do condomínio</span>
       <label class="status">Período <select id="inter-dias" class="inline">
+        <option value="ultima" selected>desde a última importação</option>
         <option value="7">últimos 7 dias</option>
-        <option value="15" selected>últimos 15 dias</option>
+        <option value="15">últimos 15 dias</option>
         <option value="30">últimos 30 dias</option>
         <option value="60">últimos 60 dias</option>
         <option value="90">últimos 90 dias</option>
         <option value="">a partir de uma data 🛫</option>
       </select></label>
       <label class="status" id="inter-desde-wrap" hidden>🛫 <input type="date" id="inter-desde" class="inline" style="width:auto"></label>
+      <span class="status" id="inter-base"></span>
       <button class="btn small" id="btn-inter">Buscar no Inter</button>
       <span class="grow"></span>
       <span class="status" id="inter-msg"></span>
@@ -481,7 +459,7 @@ td.check{text-align:center;width:80px}
 // ecossistema CDV — token e repo de dados exclusivos. Aqui so trafega o e-mail.
 const API = 'https://castanheiras-production.up.railway.app';
 const MESES = ['JAN','FEV','MAR','ABR','MAI','JUN','JUL','AGO','SET','OUT','NOV','DEZ'];
-const ROW_NO_MES = 'Cotas condominiais', ROW_ATRASO = 'Cotas recebidas em atraso';
+const ROW_NO_MES = '1.2 - Cotas condominiais', ROW_ATRASO = '1.1 - Cotas recebidas em atraso';
 // ==================================================
 
 const $ = s => document.querySelector(s);
@@ -684,7 +662,7 @@ function calcGeral(){
 // ---------- Render ----------
 function renderTudo(){
   $('#subtitulo').textContent = `Contas do condomínio · ${ANO}`;
-  renderResumo(); renderDivergencias(); renderResumoReemb(); renderCotas(); renderDespesas(); renderReembolsos(); renderLanc(); renderCadastros(); fillMesRef();
+  renderResumo(); renderDivergencias(); renderResumoReemb(); renderCotas(); renderDespesas(); renderReembolsos(); renderLanc(); renderCadastros(); fillMesRef(); atualizarInterPeriodo();
 }
 const thMeses = () => MESES.map((m,i)=>`<th class="${i===hoje.getMonth()&&ANO===hoje.getFullYear()?'mes-atual':''}">${m}</th>`).join('');
 const tdVals = (vals, cls) => vals.map(v=>{ v=v||0; return `<td class="${v===0?'zero':(cls||(v<0?'neg':''))}">${v===0?'—':fmtN(v)}</td>`; }).join('');
@@ -760,21 +738,18 @@ function renderResumo(){
   const max = Math.max(1,...C.rec,...C.desp);
   $('#meses').innerHTML = MESES.map((m,i)=>`<div class="mes" title="${m}: receitas ${fmt(C.rec[i])} · despesas ${fmt(C.desp[i])}"><div class="vals"><b class="r${C.rec[i]?'':' zero'}">${fmtK(C.rec[i])}</b><b class="d${C.desp[i]?'':' zero'}">${fmtK(C.desp[i])}</b></div><div class="bar"><i class="r" style="height:${C.rec[i]/max*100}%"></i><i class="d" style="height:${C.desp[i]/max*100}%"></i></div><label>${m}</label></div>`).join('');
   const tot = a => a.reduce((s,v)=>s+(v||0),0);
-  // O quarto item e a classe da linha: e ela que pinta receita, despesa,
-  // totalizador e saldo. Vem declarada aqui e nao adivinhada por regex no
-  // rotulo, porque o rotulo das categorias de despesa e livre.
   const linhas = [
-    ['Saldo do mês anterior', C.saldoAnt.map(v=>v??0), '', 'l-saldo'],
-    [ROW_ATRASO, C.atraso, 'rec', 'l-rec'], [ROW_NO_MES, C.noMes, 'rec', 'l-rec'],
-    ['Total das receitas', C.rec, 'rec', 'l-tot l-tot-rec'],
-    ...D.categorias.map(c=>[c, C.despCat[c]||Array(12).fill(0), 'desp', 'l-desp']),
-    ['Total das despesas', C.desp, 'desp', 'l-tot l-tot-desp'],
-    ['Resultado do mês', MESES.map((_,i)=>r2(C.rec[i]-C.desp[i])), '', 'l-tot l-forte'],
-    ['Saldo atual', C.saldo.map(v=>v??0), '', 'l-saldo l-forte'],
+    ['Saldo do mês anterior', C.saldoAnt.map(v=>v??0)],
+    [ROW_ATRASO, C.atraso, 'rec'], [ROW_NO_MES, C.noMes, 'rec'],
+    ['Total das receitas', C.rec, 'rec'],
+    ...D.categorias.map(c=>[c, C.despCat[c]||Array(12).fill(0), 'desp']),
+    ['Total das despesas', C.desp, 'desp'],
+    ['Resultado do mês', MESES.map((_,i)=>r2(C.rec[i]-C.desp[i]))],
+    ['Saldo atual', C.saldo.map(v=>v??0)],
   ];
-  $('#tbl-resumo').innerHTML = `<thead><tr><th></th>${thMeses()}<th>Total</th></tr></thead><tbody>${linhas.map(([lab,vals,cls,linha])=>{
+  $('#tbl-resumo').innerHTML = `<thead><tr><th></th>${thMeses()}<th>Total</th></tr></thead><tbody>${linhas.map(([lab,vals,cls])=>{
     const total = /^Saldo/.test(lab) ? '' : fmtN(tot(vals));
-    return `<tr class="${linha}"><td>${esc(lab)}</td>${tdVals(vals,cls)}<td><b>${total}</b></td></tr>`;}).join('')}</tbody>`;
+    return `<tr><td${/^Total|^Saldo atual/.test(lab)?' style="font-weight:600"':''}>${esc(lab)}</td>${tdVals(vals,cls)}<td><b>${total}</b></td></tr>`;}).join('')}</tbody>`;
 }
 $('#saldo-ini').onclick = async e => {
   e.preventDefault();
@@ -1267,18 +1242,68 @@ function fillMesRef(){ const sel=$('#imp-mesref'); const cur=sel.value; sel.inne
 // A API do Inter exige mTLS, entao o navegador nao fala com o banco: quem
 // busca e o servico do condominio, que devolve as transacoes ja no mesmo
 // formato do parser de OFX. Daqui para frente o fluxo e identico ao do arquivo.
+// Data do lancamento mais recente que veio do extrato — a fronteira do que ja
+// foi importado. So contam as origens de banco: cota digitada na grade e
+// reembolso nao dizem nada sobre ate onde o extrato foi lido.
+const ORIGEM_BANCO = new Set(['inter','extrato']);
+function baseUltimaImportacao(){
+  if(!D || !D.lancamentos) return null;
+  let max = null;
+  for(const l of D.lancamentos){
+    if(!ORIGEM_BANCO.has(l.origem)) continue;
+    const d = String(l.data||'').slice(0,10);
+    if(d && (!max || d > max)) max = d;
+  }
+  return max;
+}
+const diasEntre = (a,b) => Math.round((Date.parse(b+'T12:00:00Z') - Date.parse(a+'T12:00:00Z'))/86400000);
+
+// Resolve o que o select pede em um periodo concreto. O modo "ultima" comeca
+// NO dia do ultimo lancamento importado, nao no seguinte: o banco pode lancar
+// mais coisa naquele mesmo dia depois da consulta anterior. Repetir um dia nao
+// custa nada — o id da transacao marca a repetida como "ja lancado" —, mas
+// pular um dia deixa movimentacao para tras em silencio.
+function periodoInter(){
+  const modo = $('#inter-dias').value;
+  if(modo === 'ultima'){
+    const base = baseUltimaImportacao();
+    if(!base) return { filtro:'dias=15', dias:15, aviso:'sem importação anterior — buscando os últimos 15 dias' };
+    const hj = hojeISO();
+    const inicio = base > hj ? hj : base;
+    return { filtro:`inicio=${inicio}&fim=${hj}`, dias: Math.max(1, diasEntre(inicio,hj)+1), desde:inicio };
+  }
+  if(modo === ''){
+    const desde = $('#inter-desde').value;
+    if(!desde) return { erro:'Informe a data inicial' };
+    return { filtro:`inicio=${desde}&fim=${hojeISO()}`, dias: Math.max(1, diasEntre(desde,hojeISO())+1), desde };
+  }
+  return { filtro:`dias=${modo}`, dias:Number(modo) };
+}
+
+// Rotulo ao lado do select: quem vai clicar precisa saber de que dia a busca
+// parte antes de clicar, nao depois.
+function atualizarInterPeriodo(){
+  const el = $('#inter-base'); if(!el) return;
+  const modo = $('#inter-dias').value;
+  $('#inter-desde-wrap').hidden = modo !== '';
+  if(modo !== 'ultima'){ el.textContent = ''; return; }
+  const base = baseUltimaImportacao();
+  if(!base){ el.textContent = 'nenhuma importação anterior — usará os últimos 15 dias'; return; }
+  const n = Math.max(1, diasEntre(base, hojeISO())+1);
+  el.textContent = `a partir de ${fmtData(base)} · ${n} dia${n>1?'s':''}`;
+}
+
 async function buscarInter(){
-  const dias = $('#inter-dias').value;
-  const desde = $('#inter-desde').value;
-  if(!dias && !desde){ toast('Informe a data inicial', true); return; }
+  const p = periodoInter();
+  if(p.erro){ toast(p.erro, true); return; }
   const btn = $('#btn-inter');
   // O Inter limita cada consulta a 89 dias e recusa chamadas coladas, entao o
   // servico fatia o periodo e espera entre as janelas. Um ano leva ~20s.
-  const longo = !dias || Number(dias) > 89;
+  const longo = p.dias > 89;
   btn.disabled = true;
-  $('#inter-msg').textContent = longo ? 'Consultando o banco por janelas — pode levar alguns segundos…' : 'Consultando o banco…';
+  $('#inter-msg').textContent = (p.aviso ? p.aviso + ' · ' : '') + (longo ? 'Consultando o banco por janelas — pode levar alguns segundos…' : 'Consultando o banco…');
   try {
-    const filtro = dias ? `dias=${dias}` : `inicio=${desde}&fim=${hojeISO()}`;
+    const filtro = p.filtro;
     const j = await api(`/inter/transacoes?email=${encodeURIComponent(getEmail())}&${filtro}&t=${Date.now()}`);
     const trans = j.itens || [];
     if(!trans.length){ $('#inter-msg').textContent = 'Nenhuma movimentação no período'; toast('Nenhuma movimentação no período'); return; }
@@ -1294,9 +1319,9 @@ async function buscarInter(){
 }
 $('#btn-inter').onclick = buscarInter;
 $('#inter-dias').onchange = e => {
-  const porData = !e.target.value;
-  $('#inter-desde-wrap').hidden = !porData;
+  const porData = e.target.value === '';
   if(porData && !$('#inter-desde').value) $('#inter-desde').value = hojeISO().slice(0,4) + '-01-01';
+  atualizarInterPeriodo();
 };
 
 async function lerArquivo(file){
