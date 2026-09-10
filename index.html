@@ -231,6 +231,12 @@ tr.atencao:hover td{background:rgba(251,191,36,.16)}
 .result ul{margin:8px 0 0;padding-left:18px;color:var(--muted);font-weight:500}
 .empty{padding:36px 16px;color:var(--muted);text-align:center;font-size:12.5px;font-weight:600}
 body.ro .edit-only{display:none!important}
+/* Quem nao e administrador nao ve nada ligado a apartamento. O servidor ja nao
+   envia esses dados; estas regras sao a camada visual, para nao sobrar coluna
+   vazia nem aba morta. */
+body.na .admin-only{display:none!important}
+input[type=checkbox]{width:auto;accent-color:var(--accent);cursor:pointer;transform:scale(1.15)}
+td.check{text-align:center;width:80px}
 
 /* ══ TOAST ══ */
 #toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--card);border:1px solid var(--border-ctrl);border-left:3px solid var(--green);color:var(--text);padding:12px 18px;border-radius:12px;font-size:12.5px;font-weight:700;opacity:0;transition:.2s;pointer-events:none;max-width:90vw;box-shadow:0 8px 24px rgba(0,0,0,.35);z-index:200}
@@ -278,12 +284,13 @@ body.ro .edit-only{display:none!important}
       <h1>Edifício Castanheiras <small id="subtitulo">Contas do condomínio</small></h1>
       <nav role="tablist" id="tabs">
         <button role="tab" data-tab="resumo" aria-selected="true">Resumo</button>
-        <button role="tab" data-tab="cotas">Cotas</button>
+        <button role="tab" data-tab="cotas" class="admin-only">Cotas</button>
         <button role="tab" data-tab="despesas">Despesas</button>
         <button role="tab" data-tab="reembolsos">Reembolsos <span class="badge" id="badge-reemb" hidden></span></button>
         <button role="tab" data-tab="lancamentos">Lançamentos</button>
         <button role="tab" data-tab="importar" class="edit-only">Importar extrato</button>
         <button role="tab" data-tab="cadastros" class="edit-only">Moradores e regras</button>
+        <button role="tab" data-tab="config" class="admin-only">Configuração</button>
       </nav>
     </div>
     <div class="saldo">
@@ -317,7 +324,7 @@ body.ro .edit-only{display:none!important}
       <div class="kpis" id="kpis"></div>
       <div class="legend"><span><i class="r"></i>Receitas</span><span><i class="d"></i>Despesas</span></div>
     </div>
-    <div class="card" id="card-diverg" hidden>
+    <div class="card admin-only" id="card-diverg" hidden>
       <h2>Divergências de cota <span class="status" id="diverg-status"></span></h2>
       <div class="scroll"><table id="tbl-diverg"></table></div>
     </div>
@@ -331,7 +338,7 @@ body.ro .edit-only{display:none!important}
     </div>
   </section>
 
-  <section id="tab-cotas" hidden>
+  <section id="tab-cotas" class="admin-only" hidden>
     <div class="card">
       <h2>Cotas condominiais por apartamento <span class="status edit-only">Clique numa célula para registrar ou corrigir um pagamento</span></h2>
       <div class="scroll"><table id="tbl-cotas"></table></div>
@@ -397,6 +404,14 @@ body.ro .edit-only{display:none!important}
     <div class="card" id="imp-card" hidden><div class="scroll"><table id="tbl-import"></table></div></div>
   </section>
 
+  <section id="tab-config" class="admin-only" hidden>
+    <div class="card">
+      <h2>Quem acessa o sistema <span class="h2-dir"><span class="status" id="acessos-status"></span><button class="btn secondary small" id="btn-add-acesso">Adicionar</button><button class="btn small" id="btn-save-acessos">Salvar acessos</button></span></h2>
+      <div class="scroll"><table id="tbl-acessos"></table></div>
+      <div class="result status">Administradores veem e editam tudo. Quem não é administrador entra apenas nas telas gerais — receitas, despesas, demonstrativo e saldo — e o servidor não envia ao navegador dessas pessoas nada que identifique um apartamento: nem a grade de cotas, nem os moradores, nem quem pagou o quê. Você não pode remover o seu próprio acesso de administrador.</div>
+    </div>
+  </section>
+
   <section id="tab-cadastros" hidden>
     <div class="card">
       <h2>Moradores <span><button class="btn secondary small" id="btn-add-morador">Adicionar</button> <button class="btn small" id="btn-save-moradores">Salvar moradores</button></span></h2>
@@ -440,7 +455,7 @@ const fmtK = n => { n = n||0; const a = Math.abs(n);
 const norm = s => String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toUpperCase().replace(/[^A-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 const esc = s => String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const r2 = n => Math.round(n*100)/100;
-let D = null, ANO = new Date().getFullYear(), CAN_WRITE = false, IMP = [], FONTE_DESC = '';
+let D = null, ANO = new Date().getFullYear(), CAN_WRITE = false, IS_ADMIN = false, IMP = [], FONTE_DESC = '';
 const hoje = new Date();
 
 function toast(msg, err){ const t=$('#toast'); t.textContent=msg; t.className='show'+(err?' err':''); clearTimeout(t._t); t._t=setTimeout(()=>t.className='',3500); }
@@ -500,6 +515,12 @@ function ordenar(d){
 
 async function carregar(){
   const j = await api(`/castanheiras/dados?email=${encodeURIComponent(getEmail())}&t=${Date.now()}`);
+  // O papel vem do servidor a cada leitura, nunca do navegador: se o acesso
+  // for rebaixado, a proxima carga ja chega redigida.
+  IS_ADMIN = !!j.admin;
+  CAN_WRITE = IS_ADMIN;
+  document.body.classList.toggle('ro', !CAN_WRITE);
+  document.body.classList.toggle('na', !IS_ADMIN);
   return ordenar(j.dados);
 }
 
@@ -524,14 +545,14 @@ async function entrar(){
     const chk = await api(`/castanheiras/login?email=${encodeURIComponent(getEmail())}&t=${Date.now()}`);
     if(!chk.acesso) throw new Error('E-mail sem acesso às contas do condomínio');
     D = await carregar();
-    CAN_WRITE = true;
-    document.body.classList.remove('ro');
     $('#login').hidden=true; $('#app').hidden=false;
+    // Aba aberta por padrao pode ter acabado de sumir para este usuario.
+    if(document.querySelector('#tabs button[aria-selected="true"]').classList.contains('admin-only') && !IS_ADMIN) irParaAba('resumo');
     const anos = [...new Set(D.lancamentos.map(l=>+l.data.slice(0,4)).concat([hoje.getFullYear()]))].sort();
     $('#ano').innerHTML = anos.map(a=>`<option ${a===ANO?'selected':''}>${a}</option>`).join('');
     if(!anos.includes(ANO)) ANO = anos[anos.length-1];
     renderTudo();
-    setStatus(getEmail());
+    setStatus(getEmail() + (IS_ADMIN ? ' · administrador' : ' · acesso geral'));
   } catch(e){
     $('#login-msg').textContent = e.message;
     $('#login').hidden=false; $('#app').hidden=true;
@@ -562,10 +583,14 @@ $('#btn-limpar-lanc').onclick = async ()=>{
 };
 $('#btn-reload').onclick = async ()=>{ try{ D = await carregar(); renderTudo(); toast('Atualizado'); }catch(e){ toast(e.message,true);} };
 $('#ano').onchange = e => { ANO = +e.target.value; renderTudo(); };
+function irParaAba(nome){
+  document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-selected', x.dataset.tab===nome));
+  document.querySelectorAll('main section').forEach(s=>s.hidden = s.id !== 'tab-'+nome);
+  if(nome === 'config') carregarAcessos();
+}
 $('#tabs').addEventListener('click', e => {
   const b = e.target.closest('button[data-tab]'); if(!b) return;
-  document.querySelectorAll('#tabs button').forEach(x=>x.setAttribute('aria-selected', x===b));
-  document.querySelectorAll('main section').forEach(s=>s.hidden = s.id !== 'tab-'+b.dataset.tab);
+  irParaAba(b.dataset.tab);
 });
 
 // ---------- Cálculo ----------
@@ -775,7 +800,7 @@ function rowLancLeitura(x){
   return `<tr data-id="${esc(x.id)}">
     <td>${fmtData(x.data)}</td>
     <td class="desc">${esc(x.descricao)}</td>
-    <td style="text-align:left">${/receita/.test(x.tipo)?`Apto ${esc(x.destino)} · ${esc(x.mesRef)}`:esc(x.destino)}</td>
+    <td style="text-align:left">${/receita/.test(x.tipo)?(x.destino?`Apto ${esc(x.destino)} · ${esc(x.mesRef)}`:`Cota · ${esc(x.mesRef)}`):esc(x.destino)}</td>
     <td class="obs${x.obs?'':' vazia'}">${x.obs?esc(x.obs):'—'}</td>
     <td class="${/receita/.test(x.tipo)?'rec':'desp'}">${/receita/.test(x.tipo)?'+':'−'} ${fmtN(x.valor)}</td>
     <td class="acao edit-only"><button class="ed" title="Editar">✎</button><button class="x" title="Excluir">×</button></td>
@@ -866,6 +891,76 @@ $('#btn-save-moradores').onclick = async ()=>{ const rows=readRows('#tbl-morador
 $('#btn-save-regras').onclick = async ()=>{ const rows=readRows('#tbl-regras').filter(r=>r.chave); try{ await salvar(d=>{ d.regras=rows; }, 'Atualiza regras'); toast('Regras salvas'); }catch(e){toast(e.message,true);} };
 $('#btn-save-cats').onclick = async ()=>{ const rows=readRows('#tbl-cats').map(r=>r.nome).filter(Boolean); try{ await salvar(d=>{ d.categorias=rows; }, 'Atualiza categorias'); toast('Categorias salvas'); }catch(e){toast(e.message,true);} };
 
+// ---------- Configuração: acessos ----------
+// A lista de e-mails nunca viaja junto com as contas — vive nos endpoints
+// /castanheiras/acessos, e so administradores conseguem le-la ou grava-la.
+// Isso e o que impede um cliente desatualizado de apagar quem tem acesso.
+let ACESSOS = null;
+
+function rowAcesso(a={}){
+  const eu = castEqual(a.email, getEmail());
+  return `<tr>
+    <td><input type="email" data-k="email" value="${esc(a.email||'')}" placeholder="pessoa@email.com" autocomplete="off">${eu?' <span class="status">você</span>':''}</td>
+    <td class="check"><input type="checkbox" data-k="admin" ${a.admin?'checked':''}></td>
+    <td class="acao"><button class="x" title="Remover">×</button></td>
+  </tr>`;
+}
+const castEqual = (a,b) => String(a||'').trim().toLowerCase() === String(b||'').trim().toLowerCase();
+
+function renderAcessos(){
+  const L = ACESSOS || [];
+  $('#tbl-acessos').innerHTML = `<thead><tr><th style="text-align:left">E-mail</th><th class="check">Administrador</th><th></th></tr></thead>
+  <tbody>${L.map(rowAcesso).join('')}</tbody>`;
+  const admins = L.filter(a=>a.admin).length;
+  $('#acessos-status').textContent = `${L.length} pessoa${L.length===1?'':'s'} · ${admins} administrador${admins===1?'':'es'}`;
+}
+
+async function carregarAcessos(){
+  if(!IS_ADMIN) return;
+  $('#acessos-status').textContent = 'Carregando…';
+  try {
+    const j = await api(`/castanheiras/acessos?email=${encodeURIComponent(getEmail())}&t=${Date.now()}`);
+    ACESSOS = j.lista || [];
+    renderAcessos();
+  } catch(e){
+    $('#acessos-status').textContent = e.message;
+    $('#tbl-acessos').innerHTML = `<tr><td class="empty" style="text-align:center">${esc(e.message)}</td></tr>`;
+  }
+}
+
+function lerAcessos(){
+  return [...$('#tbl-acessos').querySelectorAll('tbody tr')].map(tr=>({
+    email: (tr.querySelector('[data-k="email"]')||{}).value ? tr.querySelector('[data-k="email"]').value.trim().toLowerCase() : '',
+    admin: !!(tr.querySelector('[data-k="admin"]')||{}).checked
+  })).filter(a=>a.email);
+}
+
+$('#btn-add-acesso').onclick = ()=> addRow('#tbl-acessos', rowAcesso());
+document.addEventListener('click', e => { const x=e.target.closest('#tab-config button.x'); if(x){ x.closest('tr').remove(); } });
+$('#btn-save-acessos').onclick = async ()=>{
+  const lista = lerAcessos();
+  if(!lista.length){ toast('Cadastre ao menos um e-mail', true); return; }
+  const invalido = lista.find(a=>!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(a.email));
+  if(invalido){ toast(`E-mail inválido: ${invalido.email}`, true); return; }
+  if(!lista.some(a=>a.admin)){ toast('É preciso ao menos um administrador', true); return; }
+  // A trava real esta no servidor; aqui e so para o aviso chegar antes do erro.
+  if(!lista.some(a=>a.admin && castEqual(a.email, getEmail()))){
+    toast('Você não pode remover o seu próprio acesso de administrador', true); return;
+  }
+  const comuns = lista.filter(a=>!a.admin).length;
+  if(comuns && !confirm(`${comuns} pessoa(s) entrarão sem privilégio de administrador.\n\nElas não verão cotas, moradores, divergências nem quem pagou o quê — o servidor não envia esses dados ao navegador delas.\n\nSalvar?`)) return;
+  try {
+    const j = await api('/castanheiras/acessos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: getEmail(), lista })
+    });
+    ACESSOS = j.lista || lista;
+    renderAcessos();
+    toast('Acessos salvos');
+  } catch(e){ toast(e.message, true); }
+};
+
 // ---------- Utilidades ----------
 function fmtData(s){ const m=String(s).match(/^(\d{4})-(\d{2})-(\d{2})/); return m?`${m[3]}/${m[2]}/${m[1]}`:s; }
 function hojeBR(){ return hoje.toLocaleDateString('pt-BR'); }
@@ -938,12 +1033,12 @@ function renderReembolsos(){
     $('#tbl-reemb').onclick = null;
     return;
   }
-  $('#tbl-reemb').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left">Quem pagou</th><th style="text-align:left">O que foi pago</th><th style="text-align:left">Categoria</th><th>Valor</th><th>Situação</th><th class="edit-only"></th></tr></thead>
+  $('#tbl-reemb').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left" class="admin-only">Quem pagou</th><th style="text-align:left">O que foi pago</th><th style="text-align:left">Categoria</th><th>Valor</th><th>Situação</th><th class="edit-only"></th></tr></thead>
   <tbody>${lista.map(r=>{
     const ab = rbAberto(r);
     return `<tr data-id="${esc(r.id)}">
       <td>${fmtData(r.data)}</td>
-      <td style="text-align:left">${esc(rbPessoa(r))}</td>
+      <td style="text-align:left" class="admin-only">${esc(rbPessoa(r))}</td>
       <td class="desc">${esc(r.descricao)}</td>
       <td style="text-align:left">${esc(r.categoria||'—')}</td>
       <td class="desp">${fmtN(r.valor)}</td>
@@ -979,10 +1074,10 @@ function renderResumoReemb(){
   $('#reemb-status').textContent = `${abertos.length} pendência${abertos.length>1?'s':''} · ${fmt(total)}`
     + (G.ok ? ` · saldo após restituir ${fmt(r2(G.saldo - total))}` : '');
   const L = abertos.slice().sort((a,b)=> String(a.data||'').localeCompare(String(b.data||'')));
-  $('#tbl-reemb-resumo').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left">Quem pagou</th><th style="text-align:left">O que foi pago</th><th>Valor</th></tr></thead>
+  $('#tbl-reemb-resumo').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left" class="admin-only">Quem pagou</th><th style="text-align:left">O que foi pago</th><th>Valor</th></tr></thead>
   <tbody>${L.map(r=>`<tr>
     <td>${fmtData(r.data)}</td>
-    <td style="text-align:left">${esc(rbPessoa(r))}</td>
+    <td style="text-align:left" class="admin-only">${esc(rbPessoa(r))}</td>
     <td class="desc">${esc(r.descricao)}</td>
     <td class="desp">${fmtN(r.valor)}</td>
   </tr>`).join('')}</tbody>
