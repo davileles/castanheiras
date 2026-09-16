@@ -180,6 +180,18 @@ td select[data-k="tipo"]{min-width:96px}
 td select[data-k="destino"]{min-width:190px}
 td select[data-k="mesRef"]{min-width:78px}
 tr.off td{opacity:.45}
+/* Pagamento dividido entre meses: um credito do extrato quitando mais de uma
+   cota. A linha continua unica (espelho do banco); as partes ficam visiveis. */
+.partes{display:flex;flex-direction:column;gap:2px;margin-top:3px;font-size:11px;font-weight:600;color:var(--muted)}
+.partes b{color:var(--text,inherit);font-feature-settings:"tnum" 1}
+.pill.div{background:var(--accent-soft,var(--card));color:var(--accent);margin-left:6px;vertical-align:1px}
+tr.editando .editor-partes{display:flex;flex-direction:column;gap:5px;flex-basis:100%;padding:8px 10px;border:1px dashed var(--border-ctrl);border-radius:8px}
+tr.editando .editor-partes .linha{display:flex;gap:6px;align-items:center}
+tr.editando .editor-partes input[type=number]{width:100px}
+.editor-partes .soma{font-size:11px;font-weight:700}
+.editor-partes .soma.ok-s{color:var(--rec)} .editor-partes .soma.err{color:var(--desp)}
+.lk{background:none;border:0;color:var(--accent);font-size:11.5px;font-weight:700;padding:3px 0;cursor:pointer;text-align:left}
+td.divid{background-image:linear-gradient(135deg,var(--accent) 0 5px,transparent 5px)}
 
 /* ══ GRAFICO DE MESES ══ */
 .meses{display:grid;grid-template-columns:repeat(12,1fr);gap:6px;padding:14px 18px 18px;align-items:end;height:212px}
@@ -690,22 +702,39 @@ $('#tabs').addEventListener('click', e => {
 // ---------- Cálculo ----------
 const mesIdx = m => MESES.indexOf(String(m||'').toUpperCase());
 const mesPag = l => +l.data.slice(5,7) - 1;
+// Um credito pode quitar mais de um mes (ex.: apto esquece maio e paga maio +
+// setembro num Pix so). O lancamento continua unico — valor e data do extrato —
+// e `partes` registra a divisao: [{mesRef:'MAI', valor:725}, {mesRef:'SET', valor:725}].
+// Sem divisao valida, o lancamento inteiro vale para o seu mesRef.
+function partesValidas(l){
+  const p = l && Array.isArray(l.partes) ? l.partes.filter(x => mesIdx(x.mesRef) >= 0 && (+x.valor||0) > 0) : [];
+  if (p.length < 2) return null;
+  if (Math.abs(p.reduce((s,x)=>s + +x.valor, 0) - (+l.valor||0)) >= 0.01) return null;
+  return p;
+}
+function partesDe(l){
+  return partesValidas(l) || [{ mesRef: l.mesRef, valor: l.valor }];
+}
 const doAno = () => D.lancamentos.filter(l => l.data.startsWith(String(ANO)));
 
 function calc(){
   const L = doAno();
   const rec = Array(12).fill(0), desp = Array(12).fill(0), noMes = Array(12).fill(0), atraso = Array(12).fill(0);
-  const cotas = {}, despCat = {};
+  const cotas = {}, despCat = {}, origemDiv = {};
   D.moradores.forEach(m => cotas[m.apto] = Array(12).fill(0));
   D.categorias.forEach(c => despCat[c] = Array(12).fill(0));
   for (const l of L) {
     const mp = mesPag(l);
     if (l.tipo === 'receita') {
       rec[mp] += l.valor;
-      const mr = mesIdx(l.mesRef) >= 0 ? mesIdx(l.mesRef) : mp;
-      (mr === mp ? noMes : atraso)[mp] += l.valor;
       if (!cotas[l.destino]) cotas[l.destino] = Array(12).fill(0);
-      cotas[l.destino][mr] += l.valor;
+      const div = !!partesValidas(l);
+      for (const p of partesDe(l)) {
+        const mr = mesIdx(p.mesRef) >= 0 ? mesIdx(p.mesRef) : mp;
+        (mr === mp ? noMes : atraso)[mp] += +p.valor;
+        cotas[l.destino][mr] += +p.valor;
+        if (div) ((origemDiv[l.destino] ||= {})[mr] ||= []).push({ data: l.data, parte: +p.valor, total: l.valor });
+      }
     } else {
       desp[mp] += l.valor;
       if (!despCat[l.destino]) despCat[l.destino] = Array(12).fill(0);
@@ -717,7 +746,7 @@ function calc(){
   let s = ini;
   for (let i=0;i<12;i++){ saldoAnt.push(s); if (s !== undefined && s !== null) s = r2(s + rec[i] - desp[i]); saldo.push(s); }
   let ult = -1; for (let i=0;i<12;i++) if (rec[i]||desp[i]) ult = i;
-  return { rec, desp, noMes, atraso, cotas, despCat, saldoAnt, saldo, ult, temIni: ini !== undefined && ini !== null };
+  return { rec, desp, noMes, atraso, cotas, origemDiv, despCat, saldoAnt, saldo, ult, temIni: ini !== undefined && ini !== null };
 }
 
 // Saldo consolidado da conta: parte do saldo inicial do ano mais antigo
@@ -792,8 +821,11 @@ function calcPrevisao(){
   const recebido = {};
   for (const l of D.lancamentos){
     if (l.tipo !== 'receita' || !l.data.startsWith(String(anoH))) continue;
-    const mp = +l.data.slice(5,7)-1, mr = mesIdx(l.mesRef) >= 0 ? mesIdx(l.mesRef) : mp;
-    (recebido[l.destino] = recebido[l.destino] || Array(12).fill(0))[mr] += l.valor;
+    const mp = +l.data.slice(5,7)-1;
+    for (const p of partesDe(l)) {
+      const mr = mesIdx(p.mesRef) >= 0 ? mesIdx(p.mesRef) : mp;
+      (recebido[l.destino] = recebido[l.destino] || Array(12).fill(0))[mr] += +p.valor;
+    }
   }
   const falta = i => porApto
     ? D.moradores.reduce((s,m)=> s + Math.max(0, (+m.valorCota||0) - ((recebido[m.apto]||[])[i]||0)), 0)
@@ -1138,8 +1170,10 @@ function renderCotas(){
       const vencido = ANO<hoje.getFullYear() || (ANO===hoje.getFullYear() && i<=hoje.getMonth());
       const dif = x>0 ? r2(x-(m.valorCota||0)) : 0;
       const cls = x>0 ? (x < m.valorCota-0.01 ? 'pend' : 'pago') : (vencido ? 'pend' : 'zero');
-      const marca = Math.abs(dif)>=0.01 ? ' dif' : '';
-      const tit = x>0 ? ` title="Pago ${fmtN(x)} · cota ${fmtN(m.valorCota||0)}${Math.abs(dif)>=0.01?` · diferença ${dif>0?'+':'−'} ${fmtN(Math.abs(dif))}`:''}"` : '';
+      const divs = ((C.origemDiv||{})[m.apto]||{})[i] || [];
+      const marca = (Math.abs(dif)>=0.01 ? ' dif' : '') + (divs.length ? ' divid' : '');
+      const txtDiv = divs.map(o=>` · ${fmtN(o.parte)} vieram do pagamento de ${fmtN(o.total)} em ${fmtData(o.data)} (dividido entre meses)`).join('');
+      const tit = x>0 ? ` title="Pago ${fmtN(x)} · cota ${fmtN(m.valorCota||0)}${Math.abs(dif)>=0.01?` · diferença ${dif>0?'+':'−'} ${fmtN(Math.abs(dif))}`:''}${txtDiv}"` : '';
       return `<td class="edit ${cls}${marca}" data-apto="${esc(m.apto)}" data-mes="${mes}" data-v="${x}"${tit}>${x?fmtN(x):(vencido?'pendente':'—')}</td>`;}).join('')}<td><b>${fmtN(v.reduce((s,x)=>s+x,0))}</b></td></tr>`;}).join('')}</tbody>
   <tfoot><tr><td>Total</td>${totalMes.map(v=>`<td>${v?fmtN(v):'—'}</td>`).join('')}<td>${fmtN(totalMes.reduce((s,v)=>s+v,0))}</td></tr></tfoot>`;
   $('#tbl-cotas').onclick = async e => {
@@ -1201,15 +1235,56 @@ function optDestino(x){
     ? D.moradores.map(m=>`<option value="${esc(m.apto)}" ${m.apto===x.destino?'selected':''}>${esc(m.apto)} · ${esc(m.nome)}</option>`).join('')
     : D.categorias.map(c=>`<option ${c===x.destino?'selected':''}>${esc(c)}</option>`).join('');
 }
+function destinoLeitura(x){
+  if(!/receita/.test(x.tipo)) return esc(x.destino);
+  const quem = x.destino ? `Apto ${esc(x.destino)}` : 'Cota';
+  const p = partesValidas(x);
+  if(!p) return `${quem} · ${esc(x.mesRef)}`;
+  const ord = p.slice().sort((a,b)=>mesIdx(a.mesRef)-mesIdx(b.mesRef));
+  return `${quem} · ${ord.map(y=>esc(y.mesRef)).join(' + ')} <span class="pill div" title="Um único pagamento de ${fmtN(x.valor)} quitando mais de um mês">dividido</span>
+    <div class="partes">${ord.map(y=>`<span>${esc(y.mesRef)}: <b>${fmtN(y.valor)}</b></span>`).join('')}</div>`;
+}
 function rowLancLeitura(x){
   return `<tr data-id="${esc(x.id)}">
     <td>${fmtData(x.data)}</td>
     <td class="desc">${esc(x.descricao)}</td>
-    <td style="text-align:left">${/receita/.test(x.tipo)?(x.destino?`Apto ${esc(x.destino)} · ${esc(x.mesRef)}`:`Cota · ${esc(x.mesRef)}`):esc(x.destino)}</td>
+    <td style="text-align:left">${destinoLeitura(x)}</td>
     <td class="obs${x.obs?'':' vazia'}">${x.obs?esc(x.obs):'—'}</td>
     <td class="${/receita/.test(x.tipo)?'rec':'desp'}">${/receita/.test(x.tipo)?'+':'−'} ${fmtN(x.valor)}</td>
     <td class="acao edit-only"><button class="ed" title="Editar">✎</button><button class="x" title="Excluir">×</button></td>
   </tr>`;
+}
+function editorPartes(x){
+  const soma = r2(x.partes.reduce((s,p)=>s+(+p.valor||0),0)), falta = r2((+x.valor||0) - soma);
+  const ok = Math.abs(falta) < 0.01;
+  return `<div class="editor-partes">
+    <span class="status">Divisão do pagamento de ${fmtN(x.valor)} entre meses de referência</span>
+    ${x.partes.map((p,i)=>`<div class="linha">
+      <select class="inline" data-p="mesRef" data-i="${i}">${MESES.map(m=>`<option ${m===p.mesRef?'selected':''}>${m}</option>`).join('')}</select>
+      <input type="number" step="0.01" data-p="valor" data-i="${i}" value="${p.valor||''}">
+      ${x.partes.length>2?`<button class="x" data-rm-parte="${i}" title="Remover mês">×</button>`:''}
+    </div>`).join('')}
+    <div class="linha"><button class="lk" data-add-parte="1">+ outro mês</button><button class="lk" data-desfazer-div="1" style="color:var(--muted)">desfazer divisão</button></div>
+    <span class="soma ${ok?'ok-s':'err'}">${ok?'✓ Partes somam o valor do pagamento':`Soma ${fmtN(soma)} — ${falta>0?'faltam':'sobram'} ${fmtN(Math.abs(falta))}`}</span>
+  </div>`;
+}
+// Sugestao ao dividir: o mes em aberto mais antigo do apto recebe a cota
+// cadastrada e o restante fica no mes que ja estava marcado.
+function sugerirPartes(b){
+  const atual = b.mesRef || MESES[+String(b.data).slice(5,7)-1];
+  const m = D.moradores.find(y=>y.apto===b.destino);
+  const cota = +(m&&m.valorCota)||0;
+  const outros = D.lancamentos.filter(l=>l.id!==b.id && l.destino===b.destino && /receita/.test(l.tipo) && String(l.data).slice(0,4)===String(b.data).slice(0,4));
+  const pago = Array(12).fill(0); outros.forEach(l=>partesDe(l).forEach(p=>{ const i=mesIdx(p.mesRef); if(i>=0) pago[i]+= +p.valor; }));
+  const ia = mesIdx(atual);
+  const aberto = MESES.findIndex((_,i)=> i!==ia && i<=Math.max(ia, +String(b.data).slice(5,7)-1) && cota>0 && pago[i] < cota-0.01);
+  const v = +b.valor||0;
+  if(aberto>=0 && cota>0 && cota < v){
+    const pa = r2(Math.min(cota - pago[aberto], v));
+    return [{ mesRef: MESES[aberto], valor: pa }, { mesRef: atual, valor: r2(v - pa) }];
+  }
+  const outro = MESES[ia>0 ? ia-1 : 1];
+  return [{ mesRef: outro, valor: r2(v/2) }, { mesRef: atual, valor: r2(v - r2(v/2)) }];
 }
 function rowLancEdicao(x){
   const rec = /receita/.test(x.tipo);
@@ -1219,12 +1294,22 @@ function rowLancEdicao(x){
     <td style="text-align:left" class="campos-destino">
       <select class="inline" data-e="tipo"><option value="receita" ${rec?'selected':''}>Cota</option><option value="despesa" ${rec?'':'selected'}>Despesa</option></select>
       <select class="inline" data-e="destino"><option value="">Escolher…</option>${optDestino(x)}</select>
-      ${rec?`<select class="inline" data-e="mesRef">${MESES.map(m=>`<option ${m===x.mesRef?'selected':''}>${m}</option>`).join('')}</select>`:''}
+      ${rec && !Array.isArray(x.partes)?`<select class="inline" data-e="mesRef">${MESES.map(m=>`<option ${m===x.mesRef?'selected':''}>${m}</option>`).join('')}</select>
+      <button class="lk" data-dividir="1" title="Um pagamento que quita mais de um mês">⇆ Dividir entre meses</button>`:''}
+      ${rec && Array.isArray(x.partes)?editorPartes(x):''}
     </td>
     <td class="obs"><input type="text" data-e="obs" value="${esc(x.obs||'')}" placeholder="Observação"></td>
     <td><input type="number" step="0.01" data-e="valor" value="${x.valor}"></td>
     <td class="acao edit-only"><button class="ok" title="Salvar">✓</button><button class="x" data-cancelar="1" title="Cancelar">×</button></td>
   </tr>`;
+}
+// Atualiza so o aviso de soma: redesenhar a linha a cada tecla tiraria o foco do campo.
+function atualizarSomaPartes(){
+  const el = document.querySelector('#tbl-lanc tr.editando .soma'); if(!el || !EDIT_BUF) return;
+  const soma = r2(EDIT_BUF.partes.reduce((s,p)=>s+(+p.valor||0),0)), falta = r2((+EDIT_BUF.valor||0) - soma);
+  const ok = Math.abs(falta) < 0.01;
+  el.className = 'soma ' + (ok?'ok-s':'err');
+  el.textContent = ok ? '✓ Partes somam o valor do pagamento' : `Soma ${fmtN(soma)} — ${falta>0?'faltam':'sobram'} ${fmtN(Math.abs(falta))}`;
 }
 function renderLanc(){
   const L = doAno().slice().sort((a,b)=>b.data.localeCompare(a.data));
@@ -1236,14 +1321,38 @@ function renderLanc(){
   // Rascunho acompanha cada tecla; trocar o tipo zera o destino, porque a
   // lista de aptos e a de categorias nao se misturam.
   $('#tbl-lanc').oninput = e => {
+    if(e.target.dataset.p && EDIT_BUF && Array.isArray(EDIT_BUF.partes)){
+      const p = EDIT_BUF.partes[+e.target.dataset.i]; if(!p) return;
+      p[e.target.dataset.p] = e.target.dataset.p==='valor' ? Number(e.target.value)||0 : e.target.value;
+      if(e.target.tagName==='SELECT') renderLanc(); else atualizarSomaPartes();
+      return;
+    }
     const k = e.target.dataset.e; if(!k || !EDIT_BUF) return;
+    if(k==='valor' && Array.isArray(EDIT_BUF.partes)){ EDIT_BUF.valor = Number(e.target.value)||0; atualizarSomaPartes(); return; }
     EDIT_BUF[k] = e.target.type==='number' ? Number(e.target.value)||0 : e.target.value;
-    if(k==='tipo'){ EDIT_BUF.destino=''; if(EDIT_BUF.tipo==='despesa') delete EDIT_BUF.mesRef; else EDIT_BUF.mesRef = EDIT_BUF.mesRef || MESES[+String(EDIT_BUF.data).slice(5,7)-1]; renderLanc(); }
+    if(k==='tipo'){ EDIT_BUF.destino=''; if(EDIT_BUF.tipo==='despesa'){ delete EDIT_BUF.mesRef; delete EDIT_BUF.partes; } else EDIT_BUF.mesRef = EDIT_BUF.mesRef || MESES[+String(EDIT_BUF.data).slice(5,7)-1]; renderLanc(); }
   };
 
   $('#tbl-lanc').onclick = async e => {
     const btn = e.target.closest('button'); if(!btn || !CAN_WRITE) return;
     const tr = btn.closest('tr'); const id = tr.dataset.id;
+
+    if(btn.dataset.dividir && EDIT_BUF){
+      if(!EDIT_BUF.destino){ toast('Escolha o apartamento antes de dividir', true); return; }
+      EDIT_BUF.partes = sugerirPartes(EDIT_BUF); renderLanc(); return;
+    }
+    if(btn.dataset.addParte && EDIT_BUF){
+      const usados = new Set(EDIT_BUF.partes.map(p=>p.mesRef));
+      const soma = r2(EDIT_BUF.partes.reduce((s,p)=>s+(+p.valor||0),0));
+      EDIT_BUF.partes.push({ mesRef: MESES.find(m=>!usados.has(m)) || MESES[0], valor: Math.max(0, r2((+EDIT_BUF.valor||0) - soma)) });
+      renderLanc(); return;
+    }
+    if(btn.dataset.rmParte !== undefined && EDIT_BUF){ EDIT_BUF.partes.splice(+btn.dataset.rmParte, 1); renderLanc(); return; }
+    if(btn.dataset.desfazerDiv && EDIT_BUF){
+      const mp = MESES[+String(EDIT_BUF.data).slice(5,7)-1];
+      EDIT_BUF.mesRef = (EDIT_BUF.partes.find(p=>p.mesRef===mp)||EDIT_BUF.partes[EDIT_BUF.partes.length-1]||{}).mesRef || mp;
+      delete EDIT_BUF.partes; renderLanc(); return;
+    }
 
     if(btn.classList.contains('ed')){ EDIT_ID = id; EDIT_BUF = { ...D.lancamentos.find(x=>x.id===id) }; renderLanc(); return; }
     if(btn.dataset.cancelar){ EDIT_ID = null; EDIT_BUF = null; renderLanc(); return; }
@@ -1253,6 +1362,20 @@ function renderLanc(){
       if(!b.data || !b.destino){ toast('Preencha data e destino', true); return; }
       if(!(b.valor > 0)){ toast('Valor deve ser maior que zero', true); return; }
       const editado = { ...b, obs: String(b.obs||'').trim(), valor: r2(Math.abs(b.valor)), mesRef: /receita/.test(b.tipo) ? (b.mesRef || MESES[+b.data.slice(5,7)-1]) : MESES[+b.data.slice(5,7)-1] };
+      if(/receita/.test(b.tipo) && Array.isArray(b.partes)){
+        const partes = b.partes.map(p=>({ mesRef: p.mesRef, valor: r2(+p.valor||0) }));
+        if(partes.length < 2){ toast('A divisão precisa de pelo menos dois meses', true); return; }
+        if(partes.some(p=>!(p.valor>0))){ toast('Cada mês da divisão precisa de valor maior que zero', true); return; }
+        if(new Set(partes.map(p=>p.mesRef)).size !== partes.length){ toast('Há mês repetido na divisão', true); return; }
+        const soma = r2(partes.reduce((s,p)=>s+p.valor,0));
+        if(Math.abs(soma - editado.valor) >= 0.01){ toast(`As partes somam ${fmtN(soma)}, mas o pagamento é de ${fmtN(editado.valor)}`, true); return; }
+        partes.sort((x,y)=>mesIdx(x.mesRef)-mesIdx(y.mesRef));
+        editado.partes = partes;
+        // mesRef segue existindo para leitores antigos: fica no mes do pagamento
+        // se ele faz parte da divisao; senao, no mes mais recente quitado.
+        const mp = MESES[+editado.data.slice(5,7)-1];
+        editado.mesRef = partes.some(p=>p.mesRef===mp) ? mp : partes[partes.length-1].mesRef;
+      } else delete editado.partes;
       // Sai do modo de edicao ANTES de gravar: salvar() redesenha a tabela ao
       // final, e a linha voltaria a aparecer como formulario.
       EDIT_ID = null; EDIT_BUF = null;
@@ -1838,8 +1961,7 @@ function alocarMesRef(lista){
   const marca = (apto, ano, i, v) => { ((pago[apto] ||= {})[ano] ||= Array(12).fill(0))[i] += v; };
   for(const l of D.lancamentos){
     if(!/receita/.test(l.tipo)) continue;
-    const i = mesIdx(l.mesRef); if(i < 0) continue;
-    marca(l.destino, +l.data.slice(0,4), i, l.valor);
+    for(const p of partesDe(l)){ const i = mesIdx(p.mesRef); if(i >= 0) marca(l.destino, +l.data.slice(0,4), i, +p.valor); }
   }
   for(const l of [...lista].sort((a,b)=>a.data.localeCompare(b.data))){
     if(l.tipo!=='receita' || !l.destino || l.jaLancado) continue;
