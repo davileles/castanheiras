@@ -126,10 +126,11 @@ td.pago{background:var(--rec-soft);color:var(--rec)}
 .tag.mais{background:var(--rec-soft);color:var(--rec)}
 .tag.pend{background:var(--warn-soft);color:var(--warn)}
 .tag.quit{background:var(--rec-soft);color:var(--rec)}
+.tag.fut{background:var(--card-deep);color:var(--muted);border:1px solid var(--border)}
 
 /* ══ REEMBOLSOS ══ */
 nav button .badge{display:inline-block;margin-left:6px;background:var(--warn-soft);color:var(--warn);font-size:9px;font-weight:800;padding:1px 6px;border-radius:999px;vertical-align:1px}
-.form-grid{display:grid;grid-template-columns:140px 1.1fr 1.6fr 1.2fr 120px 1.2fr auto;gap:10px;padding:15px 18px;align-items:end}
+.form-grid{display:grid;grid-template-columns:130px 1fr 1.5fr 1fr 110px 140px 1.1fr auto;gap:10px;padding:15px 18px;align-items:end}
 /* Campo de comprovante com a mesma cara dos inputs: o input[type=file] nativo
    fica escondido e o label vira a caixa clicavel. */
 .arq{display:flex;align-items:center;gap:6px;width:100%;background:var(--card);border:1px dashed var(--border-ctrl);color:var(--muted);padding:9px 12px;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;min-width:0;transition:border-color .2s}
@@ -430,11 +431,12 @@ td.check{text-align:center;width:80px}
         <div><label>Quem pagou</label><select id="rb-pessoa"></select><input type="text" id="rb-nome" placeholder="Nome de quem pagou" style="margin-top:8px" hidden></div>
         <div class="campo-largo"><label>O que foi pago</label><input type="text" id="rb-desc" placeholder="Ex.: 2 lâmpadas LED do hall"></div>
         <div><label>Categoria da despesa</label><select id="rb-cat"></select></div>
-        <div><label>Valor (R$)</label><input type="number" step="0.01" id="rb-valor" placeholder="0,00"></div>
+        <div><label>Valor total (R$)</label><input type="number" step="0.01" id="rb-valor" placeholder="0,00"></div>
+        <div><label>Parcelamento</label><select id="rb-parc"></select></div>
         <div><label>Comprovante (opcional)</label><label class="arq" id="rb-arq-box" title="PDF ou imagem"><input type="file" id="rb-arq" accept="image/*,application/pdf" hidden><span id="rb-arq-nome">📎 Anexar arquivo</span><b class="limpa" id="rb-arq-limpa" title="Remover" hidden>×</b></label></div>
         <div><button class="btn" id="rb-add">Registrar</button></div>
       </div>
-      <div class="result status">A pendência não entra no demonstrativo enquanto o dinheiro não sair da conta do condomínio — as contas aqui são o espelho do extrato. Ao restituir, a despesa é lançada na data da saída.</div>
+      <div class="result status">A pendência não entra no demonstrativo enquanto o dinheiro não sair da conta do condomínio — as contas aqui são o espelho do extrato. Ao restituir, a despesa é lançada na data da saída. Compra parcelada vira uma pendência por mês, a partir do mês da compra.</div>
     </div>
     <div class="card">
       <h2>Pendências <span class="h2-dir"><span class="status" id="rb-status"></span></span></h2>
@@ -856,7 +858,11 @@ function calcPrevisao(){
     if (x > ocasPior){ ocasPior = x; ocasPiorK = k; }
   }
   const ocasMedia = r2(ocasSoma / nMeses);
-  const restituir = r2(rbLista().filter(rbAberto).reduce((s,r)=>s+(+r.valor||0),0));
+  // Restituicoes por mes de vencimento: vencidas pesam no mes atual, parcelas
+  // futuras no mes delas.
+  const restPorK = {};
+  rbLista().filter(rbAberto).forEach(r=>{ const k = Math.max(rbK(r), kH); restPorK[k] = (restPorK[k]||0) + (+r.valor||0); });
+  const restituir = r2(restPorK[kH] || 0);
   const G = calcGeral();
   // Projeção de caixa: só o que tem data e valor esperados (cotas, recorrentes
   // e restituições já combinadas).
@@ -866,7 +872,7 @@ function calcPrevisao(){
     const k = kH + j;
     const receber = j === 0 ? cotasPendMes : cotaTotal;
     const recorr = j === 0 ? despPendMes : despMensal;
-    const rest = j === 0 ? restituir : 0;
+    const rest = r2(restPorK[k] || 0);
     const pagar = r2(recorr + rest);
     const res = r2(receber - pagar);
     if (saldo !== null) saldo = r2(saldo + res);
@@ -1524,6 +1530,35 @@ const RB_OUTRO = '__outro';
 let RB_FILTRO = 'aberto';
 const rbLista = () => { if(!Array.isArray(D.reembolsos)) D.reembolsos = []; return D.reembolsos; };
 const rbAberto = r => r.status !== 'quitado';
+// Parcelado: cada parcela e uma pendencia propria (mesmo `grupo`) com o mes em
+// que deve ser restituida — a 1a no mes da compra, as demais nos seguintes.
+// Quitar, reabrir e vincular ao extrato continuam valendo parcela a parcela,
+// e a despesa cai no demonstrativo mes a mes, conforme cada restituicao.
+const RB_MAX_PARC = 24;
+const mesK = v => { const [y,m] = String(v).slice(0,7).split('-').map(Number); return y*12 + m - 1; };
+const rbKParaMes = k => `${Math.floor(k/12)}-${String(k%12+1).padStart(2,'0')}`;
+const rbVenc = r => r.vencimento || String(r.data||'').slice(0,7);
+const rbK = r => mesK(rbVenc(r));
+const kHoje = () => hoje.getFullYear()*12 + hoje.getMonth();
+const rbVencido = r => rbK(r) <= kHoje();
+const rbDesc = r => (+r.parcelas > 1) ? `${r.descricao} (parcela ${r.parcela}/${r.parcelas})` : (r.descricao || '');
+const fmtMes = v => { const [y,m] = String(v).split('-'); return `${m}/${y}`; };
+// Centavos que sobram da divisao vao para a ultima parcela.
+function dividirParcelas(total, n){
+  const base = Math.floor(total * 100 / n) / 100;
+  const arr = Array(n).fill(base); arr[n-1] = r2(total - base * (n-1));
+  return arr;
+}
+function fillParc(){
+  const s = $('#rb-parc'); const v = s.value || '1';
+  const total = r2(Math.abs(Number($('#rb-valor').value)||0));
+  let h = `<option value="1">À vista</option>`;
+  for(let n = 2; n <= RB_MAX_PARC; n++){
+    const p = total > 0 ? dividirParcelas(total, n) : null;
+    h += `<option value="${n}">${n}x${p ? ` de ${fmt(p[0])}` + (p[n-1] !== p[0] ? '*' : '') : ''}</option>`;
+  }
+  s.innerHTML = h; s.value = v;
+}
 const hojeISO = () => new Date(hoje.getTime() - hoje.getTimezoneOffset()*60000).toISOString().slice(0,10);
 // O nome sai sempre do cadastro quando o pagador e morador: se o apto mudar de
 // dono, a pendencia antiga continua apontando para a pessoa certa do cadastro.
@@ -1544,7 +1579,9 @@ function fillRb(){
   p.value = vp; c.value = vc;
   $('#rb-nome').hidden = p.value !== RB_OUTRO;
   if(!$('#rb-data').value) $('#rb-data').value = hojeISO();
+  fillParc();
 }
+$('#rb-valor').addEventListener('input', fillParc);
 $('#rb-pessoa').onchange = e => { $('#rb-nome').hidden = e.target.value !== RB_OUTRO; if(!$('#rb-nome').hidden) $('#rb-nome').focus(); };
 $('#rb-filtros').onclick = e => {
   const b = e.target.closest('button[data-f]'); if(!b) return;
@@ -1559,15 +1596,20 @@ function renderReembolsos(){
   fillRb();
   const L = rbLista();
   const abertos = L.filter(rbAberto);
-  const total = r2(abertos.reduce((s,x)=>s+(+x.valor||0),0));
+  const vencidos = abertos.filter(rbVencido), futuros = abertos.filter(x=>!rbVencido(x));
+  const soma = a => r2(a.reduce((s,x)=>s+(+x.valor||0),0));
   const badge = $('#badge-reemb');
-  badge.hidden = !abertos.length; badge.textContent = abertos.length;
+  badge.hidden = !vencidos.length; badge.textContent = vencidos.length;
   $('#rb-status').textContent = abertos.length
-    ? `${abertos.length} em aberto · ${fmt(total)} a restituir`
+    ? `${vencidos.length} em aberto · ${fmt(soma(vencidos))} a restituir`
+      + (futuros.length ? ` · ${futuros.length} parcela${futuros.length>1?'s':''} a vencer (${fmt(soma(futuros))})` : '')
     : (L.length ? 'Nenhuma pendência em aberto' : 'Nenhum registro');
 
+  // Em aberto: proxima a vencer primeiro. Demais filtros: mais recente primeiro.
   const lista = (RB_FILTRO==='aberto' ? abertos : RB_FILTRO==='quitado' ? L.filter(x=>!rbAberto(x)) : L.slice())
-    .sort((a,b)=> String(b.data||'').localeCompare(String(a.data||'')));
+    .sort(RB_FILTRO==='aberto'
+      ? (a,b)=> rbK(a)-rbK(b) || String(a.data||'').localeCompare(String(b.data||'')) || (+a.parcela||0)-(+b.parcela||0)
+      : (a,b)=> String(b.data||'').localeCompare(String(a.data||'')) || (+a.parcela||0)-(+b.parcela||0));
 
   if(!lista.length){
     $('#tbl-reemb').innerHTML = `<tr><td class="empty" style="text-align:center">${RB_FILTRO==='aberto'?'Nada a restituir no momento.':'Nenhum registro.'}</td></tr>`;
@@ -1580,13 +1622,15 @@ function renderReembolsos(){
     return `<tr data-id="${esc(r.id)}">
       <td>${fmtData(r.data)}</td>
       <td style="text-align:left" class="admin-only">${esc(rbPessoa(r))}</td>
-      <td class="desc">${esc(r.descricao)}</td>
+      <td class="desc">${esc(rbDesc(r))}</td>
       <td style="text-align:left">${esc(r.categoria||'—')}</td>
       <td class="desp">${fmtN(r.valor)}</td>
       <td class="admin-only">${r.comprovante
         ? `<button class="btn-comp" data-ver="1" title="Ver ${esc(r.comprovante.nome||'comprovante')}">📎</button>`
         : (CAN_WRITE ? `<button class="btn-comp add" data-anexar="1" title="Anexar comprovante">+ anexar</button>` : '—')}</td>
-      <td>${ab ? `<span class="tag pend">Em aberto</span>` : `<span class="tag quit">Restituído ${fmtData(r.quitadoEm)}</span>`}</td>
+      <td>${!ab ? `<span class="tag quit">Restituído ${fmtData(r.quitadoEm)}</span>`
+        : !rbVencido(r) ? `<span class="tag fut">A vencer ${fmtMes(rbVenc(r))}</span>`
+        : `<span class="tag pend">Em aberto${+r.parcelas>1 ? ' · ' + fmtMes(rbVenc(r)) : ''}</span>`}</td>
       <td class="acao edit-only">${ab
         ? `<button class="btn secondary small" data-quitar="1">Restituir</button> <button class="x" data-del="1" title="Excluir">×</button>`
         : `<button class="btn secondary small" data-reabrir="1">Reabrir</button>`}</td>
@@ -1603,8 +1647,15 @@ function renderReembolsos(){
     if(btn.dataset.reabrir) return rbReabrir(id);
     if(btn.dataset.del){
       const r = rbLista().find(x=>x.id===id); if(!r) return;
-      if(!confirm(`Excluir a pendência "${r.descricao}" de ${fmtN(r.valor)}?`)) return;
-      try { await salvar(d=>{ d.reembolsos = (d.reembolsos||[]).filter(x=>x.id!==id); }, `Exclui reembolso ${id}`); toast('Pendência excluída'); }
+      // Parcela avulsa nao faz sentido: a compra sai inteira. Parcelas ja
+      // restituidas ficam, porque o dinheiro ja saiu da conta.
+      const irmas = r.grupo ? rbLista().filter(x=>x.grupo===r.grupo && rbAberto(x)) : [r];
+      const msg = irmas.length > 1
+        ? `Excluir a compra "${r.descricao}"? As ${irmas.length} parcelas em aberto (${fmtN(r2(irmas.reduce((s,x)=>s+(+x.valor||0),0)))}) serão removidas.`
+        : `Excluir a pendência "${rbDesc(r)}" de ${fmtN(r.valor)}?`;
+      if(!confirm(msg)) return;
+      const ids = new Set(irmas.map(x=>x.id));
+      try { await salvar(d=>{ d.reembolsos = (d.reembolsos||[]).filter(x=>!ids.has(x.id)); }, `Exclui reembolso ${r.grupo || id}`); toast(ids.size > 1 ? 'Parcelas excluídas' : 'Pendência excluída'); }
       catch(err){ toast(err.message, true); }
     }
   };
@@ -1613,19 +1664,23 @@ function renderReembolsos(){
 // Espelho resumido no Resumo: quem abre o app precisa ver a divida sem ter de
 // lembrar de visitar a aba.
 function renderResumoReemb(){
-  const abertos = rbLista().filter(rbAberto);
+  // So o que ja venceu: parcela de mes futuro nao pesa no caixa de hoje.
+  const todos = rbLista().filter(rbAberto);
+  const abertos = todos.filter(rbVencido);
+  const futuro = r2(todos.filter(x=>!rbVencido(x)).reduce((s,x)=>s+(+x.valor||0),0));
   $('#card-reemb').hidden = !abertos.length;
   if(!abertos.length) return;
   const total = r2(abertos.reduce((s,x)=>s+(+x.valor||0),0));
   const G = calcGeral();
   $('#reemb-status').textContent = `${abertos.length} pendência${abertos.length>1?'s':''} · ${fmt(total)}`
-    + (G.ok ? ` · saldo após restituir ${fmt(r2(G.saldo - total))}` : '');
-  const L = abertos.slice().sort((a,b)=> String(a.data||'').localeCompare(String(b.data||'')));
+    + (G.ok ? ` · saldo após restituir ${fmt(r2(G.saldo - total))}` : '')
+    + (futuro > 0 ? ` · + ${fmt(futuro)} em parcelas futuras` : '');
+  const L = abertos.slice().sort((a,b)=> rbK(a)-rbK(b) || String(a.data||'').localeCompare(String(b.data||'')));
   $('#tbl-reemb-resumo').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left" class="admin-only">Quem pagou</th><th style="text-align:left">O que foi pago</th><th>Valor</th></tr></thead>
   <tbody>${L.map(r=>`<tr>
     <td>${fmtData(r.data)}</td>
     <td style="text-align:left" class="admin-only">${esc(rbPessoa(r))}</td>
-    <td class="desc">${esc(r.descricao)}</td>
+    <td class="desc">${esc(rbDesc(r))}</td>
     <td class="desp">${fmtN(r.valor)}</td>
   </tr>`).join('')}</tbody>
   <tfoot><tr><td colspan="3">Total a restituir</td><td class="desp">${fmtN(total)}</td></tr></tfoot>`;
@@ -1712,6 +1767,7 @@ $('#rb-arq-depois').onchange = async e => {
       const alvo = (d.reembolsos||[]).find(x=>x.id===id);
       if(!alvo) throw new Error('Pendência não encontrada — recarregue a página');
       alvo.comprovante = comp;
+      if(alvo.grupo) d.reembolsos.forEach(x=>{ if(x.grupo===alvo.grupo && !x.comprovante) x.comprovante = comp; });
     }, `Anexa comprovante ao reembolso ${id}`);
     toast('Comprovante anexado');
   } catch(err){ toast(err.message, true); }
@@ -1730,6 +1786,8 @@ $('#rb-add').onclick = async ()=>{
   if(!cat){ toast('Escolha a categoria da despesa', true); return; }
   if(!(valor > 0)){ toast('Valor deve ser maior que zero', true); return; }
   const morador = D.moradores.find(m=>m.apto===sel);
+  const nParc = Math.min(RB_MAX_PARC, Math.max(1, parseInt($('#rb-parc').value, 10) || 1));
+  if(nParc > 1 && valor / nParc < 0.01){ toast('Valor pequeno demais para esse parcelamento', true); return; }
   const novo = {
     id: hash('RB' + data + desc + valor + Date.now()),
     data,
@@ -1739,16 +1797,23 @@ $('#rb-add').onclick = async ()=>{
     status: 'aberto',
     criadoEm: new Date().toISOString(), criadoPor: getEmail()
   };
+  // Uma pendencia por parcela; `valorTotal` guarda a compra inteira.
+  const itens = nParc === 1 ? [novo] : dividirParcelas(valor, nParc).map((v, i) => ({
+    ...novo,
+    id: hash('RB' + data + desc + valor + i + Date.now()),
+    grupo: novo.id, parcela: i + 1, parcelas: nParc,
+    vencimento: rbKParaMes(mesK(data) + i), valor: v, valorTotal: valor
+  }));
   const arq = $('#rb-arq').files[0];
   const btn = $('#rb-add'); btn.disabled = true;
   try {
     // Arquivo primeiro: se o upload falhar, nada foi gravado e o formulario
     // continua preenchido para tentar de novo.
-    if(arq){ toast('Enviando comprovante…'); novo.comprovante = await enviarComprovante(arq); }
-    await salvar(d=>{ if(!Array.isArray(d.reembolsos)) d.reembolsos = []; d.reembolsos.push(novo); },
-      `Registra reembolso a ${novo.pessoa || novo.apto} (${fmtN(valor)})`);
-    $('#rb-desc').value=''; $('#rb-valor').value=''; $('#rb-nome').value=''; rbLimparArquivo();
-    toast('Pendência registrada');
+    if(arq){ toast('Enviando comprovante…'); const comp = await enviarComprovante(arq); itens.forEach(x=>x.comprovante = comp); }
+    await salvar(d=>{ if(!Array.isArray(d.reembolsos)) d.reembolsos = []; d.reembolsos.push(...itens); },
+      `Registra reembolso a ${novo.pessoa || novo.apto} (${fmtN(valor)}${nParc>1 ? ` em ${nParc}x` : ''})`);
+    $('#rb-desc').value=''; $('#rb-valor').value=''; $('#rb-nome').value=''; $('#rb-parc').value='1'; fillParc(); rbLimparArquivo();
+    toast(nParc > 1 ? `${nParc} parcelas registradas` : 'Pendência registrada');
   } catch(e){ toast(e.message, true); }
   finally { btn.disabled = false; }
 };
@@ -1771,7 +1836,7 @@ function abrirQuitacao(id){
   $('#rb-modal').innerHTML = `<div class="box">
     <h2>Registrar restituição</h2>
     <div class="mbody">
-      <div class="mresumo">${esc(rbPessoa(r))}<br>${esc(r.descricao)} · <b>${fmt(r.valor)}</b><br><span class="status">Pago em ${fmtData(r.data)} · ${esc(r.categoria||'—')}</span></div>
+      <div class="mresumo">${esc(rbPessoa(r))}<br>${esc(rbDesc(r))} · <b>${fmt(r.valor)}</b><br><span class="status">Pago em ${fmtData(r.data)} · ${esc(r.categoria||'—')}${+r.parcelas>1 ? ` · vence ${fmtMes(rbVenc(r))} · compra de ${fmt(r.valorTotal||0)}` : ''}</span></div>
       <div>
         <span class="mlab">Como o dinheiro saiu da conta do condomínio?</span>
         <div class="mopt" style="margin-bottom:8px"><label><input type="radio" name="rbmodo" value="novo" checked> Criar o lançamento de despesa agora</label></div>
@@ -1807,7 +1872,7 @@ function abrirQuitacao(id){
       if(!dataQ){ toast('Informe a data da saída', true); return; }
       if(dataQ < r.data && !confirm('A data da restituição é anterior ao pagamento. Confirmar mesmo assim?')) return;
     }
-    const desc = `Restituição a ${rbPessoa(r)} — ${r.descricao}`;
+    const desc = `Restituição a ${rbPessoa(r)} — ${rbDesc(r)}`;
     const valor = r2(Math.abs(+r.valor||0)), cat = r.categoria;
     fecharModal();
     try {
