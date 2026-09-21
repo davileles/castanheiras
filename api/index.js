@@ -13,7 +13,7 @@ const inter = require('./inter');
 
 const app = express();
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '12mb' }));
 
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN || '';
 const GITHUB_REPO  = process.env.GITHUB_REPO || 'davileles/castanheiras-dados';
@@ -120,7 +120,8 @@ function redigir(d) {
   });
   out.reembolsos = (d.reembolsos || []).map(r => {
     const c = { ...r };
-    delete c.apto; delete c.pessoa; delete c.criadoPor;
+    // O recibo mostra nome/CPF de quem pagou: não sai para morador.
+    delete c.apto; delete c.pessoa; delete c.criadoPor; delete c.comprovante;
     return c;
   });
   return out;
@@ -257,6 +258,55 @@ rotas.get('/inter/transacoes', async (req, res) => {
     if (!await exigirAdmin(req, res)) return;
     const p = inter.periodoPadrao(Number(req.query.dias) || 15);
     res.json({ ok: true, ...(await inter.transacoes(req.query.inicio || p.inicio, req.query.fim || p.fim)) });
+  } catch (e) { res.status(500).json({ ok: false, erro: e.message }); }
+});
+
+// ── Comprovantes ─────────────────────────────────────────────────────────────
+// Arquivos anexados aos reembolsos. Vão para a pasta comprovantes/ do mesmo
+// repositório privado; no dados.json fica só o caminho. Leitura e escrita são
+// somente admin — recibo de Pix traz nome e CPF.
+const COMP_TIPOS = { 'application/pdf': 'pdf', 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+const COMP_EXT_TIPO = { pdf: 'application/pdf', jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' };
+const COMP_RE = /^comprovantes\/[a-z0-9-]+\.(pdf|jpg|png|webp)$/;
+const COMP_MAX = 6 * 1024 * 1024;
+const compUrl = (p) => `https://api.github.com/repos/${GITHUB_REPO}/contents/${p}`;
+
+rotas.post('/comprovantes', async (req, res) => {
+  try {
+    const email = await exigirAdmin(req, res); if (!email) return;
+    const { tipo, base64 } = req.body || {};
+    const ext = COMP_TIPOS[String(tipo || '').toLowerCase()];
+    if (!ext) return res.status(400).json({ ok: false, erro: 'Tipo de arquivo não aceito (PDF, JPG, PNG ou WEBP)' });
+    const buf = Buffer.from(String(base64 || ''), 'base64');
+    if (!buf.length) return res.status(400).json({ ok: false, erro: 'Arquivo vazio' });
+    if (buf.length > COMP_MAX) return res.status(400).json({ ok: false, erro: 'Arquivo acima de 6 MB' });
+    const d = new Date();
+    const id = `${d.toISOString().slice(0, 10)}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+    const path = `comprovantes/${id}.${ext}`;
+    const nome = String((req.body && req.body.nome) || '').slice(0, 80);
+    const r = await fetch(compUrl(path), {
+      method: 'PUT', headers: ghHeaders(),
+      body: JSON.stringify({ message: `Comprovante ${nome || id} (${email})`, content: buf.toString('base64'), branch: BRANCH })
+    });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(j.message || `Falha ao gravar comprovante (${r.status})`);
+    res.json({ ok: true, path });
+  } catch (e) { res.status(500).json({ ok: false, erro: e.message }); }
+});
+
+rotas.get('/comprovantes', async (req, res) => {
+  try {
+    if (!await exigirAdmin(req, res)) return;
+    const path = String(req.query.path || '');
+    if (!COMP_RE.test(path)) return res.status(400).json({ ok: false, erro: 'Caminho inválido' });
+    // Accept raw serve arquivos até 100 MB direto da API (sem CDN com cache).
+    const r = await fetch(`${compUrl(path)}?ref=${BRANCH}`, { headers: { ...ghHeaders(), Accept: 'application/vnd.github.raw' } });
+    if (r.status === 404) return res.status(404).json({ ok: false, erro: 'Comprovante não encontrado' });
+    if (!r.ok) throw new Error(`GitHub respondeu ${r.status}`);
+    const buf = Buffer.from(await r.arrayBuffer());
+    res.set('Content-Type', COMP_EXT_TIPO[path.split('.').pop()]);
+    res.set('Cache-Control', 'private, no-store');
+    res.send(buf);
   } catch (e) { res.status(500).json({ ok: false, erro: e.message }); }
 });
 

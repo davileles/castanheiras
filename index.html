@@ -129,7 +129,18 @@ td.pago{background:var(--rec-soft);color:var(--rec)}
 
 /* ══ REEMBOLSOS ══ */
 nav button .badge{display:inline-block;margin-left:6px;background:var(--warn-soft);color:var(--warn);font-size:9px;font-weight:800;padding:1px 6px;border-radius:999px;vertical-align:1px}
-.form-grid{display:grid;grid-template-columns:140px 1.1fr 1.6fr 1.2fr 120px auto;gap:10px;padding:15px 18px;align-items:end}
+.form-grid{display:grid;grid-template-columns:140px 1.1fr 1.6fr 1.2fr 120px 1.2fr auto;gap:10px;padding:15px 18px;align-items:end}
+/* Campo de comprovante com a mesma cara dos inputs: o input[type=file] nativo
+   fica escondido e o label vira a caixa clicavel. */
+.arq{display:flex;align-items:center;gap:6px;width:100%;background:var(--card);border:1px dashed var(--border-ctrl);color:var(--muted);padding:9px 12px;border-radius:10px;font-size:12.5px;font-weight:600;cursor:pointer;min-width:0;transition:border-color .2s}
+.arq:hover{border-color:var(--accent)}
+.arq.tem{border-style:solid;color:var(--text)}
+.arq span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}
+.arq .limpa{flex:none;color:var(--muted2);font-size:15px;line-height:1;padding:0 2px}
+.arq .limpa:hover{color:var(--desp)}
+.btn-comp{background:none;border:0;cursor:pointer;font-size:15px;padding:2px 6px;border-radius:6px;line-height:1}
+.btn-comp:hover{background:var(--card-deep)}
+.btn-comp.add{font-size:11px;font-weight:700;color:var(--muted);border:1px dashed var(--border-ctrl);padding:3px 8px}
 .form-grid label{display:block;font-size:9.5px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.7px;margin-bottom:5px}
 .form-grid .btn{white-space:nowrap}
 .filtros.dentro{padding:12px 18px 0;margin:0}
@@ -411,6 +422,7 @@ td.check{text-align:center;width:80px}
   </section>
 
   <section id="tab-reembolsos" hidden>
+    <input type="file" id="rb-arq-depois" accept="image/*,application/pdf" hidden>
     <div class="card edit-only">
       <h2>Registrar pagamento feito por fora da conta</h2>
       <div class="form-grid">
@@ -419,6 +431,7 @@ td.check{text-align:center;width:80px}
         <div class="campo-largo"><label>O que foi pago</label><input type="text" id="rb-desc" placeholder="Ex.: 2 lâmpadas LED do hall"></div>
         <div><label>Categoria da despesa</label><select id="rb-cat"></select></div>
         <div><label>Valor (R$)</label><input type="number" step="0.01" id="rb-valor" placeholder="0,00"></div>
+        <div><label>Comprovante (opcional)</label><label class="arq" id="rb-arq-box" title="PDF ou imagem"><input type="file" id="rb-arq" accept="image/*,application/pdf" hidden><span id="rb-arq-nome">📎 Anexar arquivo</span><b class="limpa" id="rb-arq-limpa" title="Remover" hidden>×</b></label></div>
         <div><button class="btn" id="rb-add">Registrar</button></div>
       </div>
       <div class="result status">A pendência não entra no demonstrativo enquanto o dinheiro não sair da conta do condomínio — as contas aqui são o espelho do extrato. Ao restituir, a despesa é lançada na data da saída.</div>
@@ -1561,7 +1574,7 @@ function renderReembolsos(){
     $('#tbl-reemb').onclick = null;
     return;
   }
-  $('#tbl-reemb').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left" class="admin-only">Quem pagou</th><th style="text-align:left">O que foi pago</th><th style="text-align:left">Categoria</th><th>Valor</th><th>Situação</th><th class="edit-only"></th></tr></thead>
+  $('#tbl-reemb').innerHTML = `<thead><tr><th>Data</th><th style="text-align:left" class="admin-only">Quem pagou</th><th style="text-align:left">O que foi pago</th><th style="text-align:left">Categoria</th><th>Valor</th><th class="admin-only">Comprovante</th><th>Situação</th><th class="edit-only"></th></tr></thead>
   <tbody>${lista.map(r=>{
     const ab = rbAberto(r);
     return `<tr data-id="${esc(r.id)}">
@@ -1570,16 +1583,22 @@ function renderReembolsos(){
       <td class="desc">${esc(r.descricao)}</td>
       <td style="text-align:left">${esc(r.categoria||'—')}</td>
       <td class="desp">${fmtN(r.valor)}</td>
+      <td class="admin-only">${r.comprovante
+        ? `<button class="btn-comp" data-ver="1" title="Ver ${esc(r.comprovante.nome||'comprovante')}">📎</button>`
+        : (CAN_WRITE ? `<button class="btn-comp add" data-anexar="1" title="Anexar comprovante">+ anexar</button>` : '—')}</td>
       <td>${ab ? `<span class="tag pend">Em aberto</span>` : `<span class="tag quit">Restituído ${fmtData(r.quitadoEm)}</span>`}</td>
       <td class="acao edit-only">${ab
         ? `<button class="btn secondary small" data-quitar="1">Restituir</button> <button class="x" data-del="1" title="Excluir">×</button>`
         : `<button class="btn secondary small" data-reabrir="1">Reabrir</button>`}</td>
     </tr>`;}).join('')}</tbody>
-  <tfoot><tr><td colspan="4">Total ${RB_FILTRO==='aberto'?'em aberto':'listado'}</td><td class="desp">${fmtN(r2(lista.reduce((s,x)=>s+(+x.valor||0),0)))}</td><td colspan="2"></td></tr></tfoot>`;
+  <tfoot><tr><td colspan="4">Total ${RB_FILTRO==='aberto'?'em aberto':'listado'}</td><td class="desp">${fmtN(r2(lista.reduce((s,x)=>s+(+x.valor||0),0)))}</td><td class="admin-only"></td><td colspan="2"></td></tr></tfoot>`;
 
   $('#tbl-reemb').onclick = async e => {
-    const btn = e.target.closest('button'); if(!btn || !CAN_WRITE) return;
+    const btn = e.target.closest('button'); if(!btn) return;
     const id = btn.closest('tr').dataset.id;
+    if(btn.dataset.ver) return rbVerComprovante(id);
+    if(!CAN_WRITE) return;
+    if(btn.dataset.anexar){ RB_ANEXAR_ID = id; $('#rb-arq-depois').click(); return; }
     if(btn.dataset.quitar) return abrirQuitacao(id);
     if(btn.dataset.reabrir) return rbReabrir(id);
     if(btn.dataset.del){
@@ -1612,6 +1631,92 @@ function renderResumoReemb(){
   <tfoot><tr><td colspan="3">Total a restituir</td><td class="desp">${fmtN(total)}</td></tr></tfoot>`;
 }
 
+// ---------- Comprovantes ----------
+// O arquivo vai para o repo privado de dados (pasta comprovantes/) pelo
+// servico do condominio; no JSON fica so a referencia. Foto de celular sai
+// reduzida para 1600px em JPEG: legivel para conferir o recibo e sem inchar
+// o repositorio. PDF sobe como veio.
+const COMP_MAX = 6 * 1024 * 1024;
+let RB_ANEXAR_ID = null;
+
+function lerBase64(blob){
+  return new Promise((res, rej)=>{
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result).split(',')[1] || '');
+    fr.onerror = () => rej(new Error('Não foi possível ler o arquivo'));
+    fr.readAsDataURL(blob);
+  });
+}
+async function reduzirImagem(file){
+  try {
+    const bmp = await createImageBitmap(file);
+    const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
+    const cv = document.createElement('canvas');
+    cv.width = Math.round(bmp.width * k); cv.height = Math.round(bmp.height * k);
+    const ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(bmp, 0, 0, cv.width, cv.height);
+    const blob = await new Promise(r => cv.toBlob(r, 'image/jpeg', 0.82));
+    if(blob && blob.size < file.size) return { blob, tipo: 'image/jpeg', nome: file.name.replace(/\.[^.]+$/, '') + '.jpg' };
+  } catch {}
+  return { blob: file, tipo: file.type, nome: file.name };
+}
+async function enviarComprovante(file){
+  const pdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
+  if(!pdf && !/^image\//.test(file.type)) throw new Error('Envie um PDF ou uma imagem');
+  const p = pdf ? { blob: file, tipo: 'application/pdf', nome: file.name } : await reduzirImagem(file);
+  if(p.blob.size > COMP_MAX) throw new Error('Arquivo acima de 6 MB');
+  const j = await api('/comprovantes', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: getEmail(), nome: p.nome, tipo: p.tipo, base64: await lerBase64(p.blob) })
+  });
+  return { path: j.path, nome: p.nome, tipo: p.tipo, tamanho: p.blob.size, enviadoEm: new Date().toISOString() };
+}
+// A janela abre ja no clique (antes do fetch) para o bloqueador de pop-up nao
+// barrar; o arquivo chega depois como blob.
+async function rbVerComprovante(id){
+  const r = rbLista().find(x=>x.id===id); if(!r || !r.comprovante) return;
+  const w = window.open('', '_blank');
+  if(w) w.document.write('<p style="font-family:sans-serif;padding:20px">Carregando comprovante…</p>');
+  try {
+    const resp = await fetch(`${API}/comprovantes?email=${encodeURIComponent(getEmail())}&path=${encodeURIComponent(r.comprovante.path)}&t=${Date.now()}`, { cache:'no-store' });
+    if(!resp.ok){ let j=null; try{ j=await resp.json(); }catch{} throw new Error((j&&j.erro) || ('Servidor respondeu ' + resp.status)); }
+    const url = URL.createObjectURL(await resp.blob());
+    if(w) w.location.href = url; else location.href = url;
+    setTimeout(()=>URL.revokeObjectURL(url), 60000);
+  } catch(e){ if(w) w.close(); toast(e.message, true); }
+}
+function rbLimparArquivo(){
+  $('#rb-arq').value = '';
+  $('#rb-arq-nome').textContent = '📎 Anexar arquivo';
+  $('#rb-arq-box').classList.remove('tem');
+  $('#rb-arq-limpa').hidden = true;
+}
+$('#rb-arq').onchange = e => {
+  const f = e.target.files[0]; if(!f) return rbLimparArquivo();
+  $('#rb-arq-nome').textContent = '📎 ' + f.name;
+  $('#rb-arq-box').classList.add('tem');
+  $('#rb-arq-limpa').hidden = false;
+};
+$('#rb-arq-limpa').onclick = e => { e.preventDefault(); e.stopPropagation(); rbLimparArquivo(); };
+// Anexar depois: pendencia ja registrada (inclusive restituida) sem recibo.
+$('#rb-arq-depois').onchange = async e => {
+  const f = e.target.files[0]; e.target.value = '';
+  const id = RB_ANEXAR_ID; RB_ANEXAR_ID = null;
+  if(!f || !id || !CAN_WRITE) return;
+  try {
+    toast('Enviando comprovante…');
+    const comp = await enviarComprovante(f);
+    await salvar(d=>{
+      const alvo = (d.reembolsos||[]).find(x=>x.id===id);
+      if(!alvo) throw new Error('Pendência não encontrada — recarregue a página');
+      alvo.comprovante = comp;
+    }, `Anexa comprovante ao reembolso ${id}`);
+    toast('Comprovante anexado');
+  } catch(err){ toast(err.message, true); }
+};
+
 $('#rb-add').onclick = async ()=>{
   if(!CAN_WRITE) return;
   const data = $('#rb-data').value;
@@ -1634,12 +1739,18 @@ $('#rb-add').onclick = async ()=>{
     status: 'aberto',
     criadoEm: new Date().toISOString(), criadoPor: getEmail()
   };
+  const arq = $('#rb-arq').files[0];
+  const btn = $('#rb-add'); btn.disabled = true;
   try {
+    // Arquivo primeiro: se o upload falhar, nada foi gravado e o formulario
+    // continua preenchido para tentar de novo.
+    if(arq){ toast('Enviando comprovante…'); novo.comprovante = await enviarComprovante(arq); }
     await salvar(d=>{ if(!Array.isArray(d.reembolsos)) d.reembolsos = []; d.reembolsos.push(novo); },
       `Registra reembolso a ${novo.pessoa || novo.apto} (${fmtN(valor)})`);
-    $('#rb-desc').value=''; $('#rb-valor').value=''; $('#rb-nome').value='';
+    $('#rb-desc').value=''; $('#rb-valor').value=''; $('#rb-nome').value=''; rbLimparArquivo();
     toast('Pendência registrada');
   } catch(e){ toast(e.message, true); }
+  finally { btn.disabled = false; }
 };
 
 // ---------- Quitação ----------
