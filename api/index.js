@@ -32,6 +32,10 @@ const BASE = {
   // Categorias de despesa marcadas como recorrentes: a média dos últimos 6
   // meses de cada uma vira a previsão mensal no Resumo.
   recorrentes: [],
+  // Cobranças à parte da cota (obras), em parcelas por apartamento:
+  // {id, nome, parcelas, valorParcela, inicio:'AAAA-MM'}. Lançamento com
+  // `rateio: <id>` pertence a ela.
+  rateios: [],
   saldoInicial: {},
   acessos: [],
   // Subconjunto de `acessos` que enxerga tudo. Vazio = arquivo anterior a esta
@@ -112,9 +116,14 @@ function redigir(d) {
   // A previsão de receitas precisa do total mensal de cotas; o total não
   // identifica ninguém, o cadastro por apartamento sim.
   out.cotaMensalTotal = Math.round((d.moradores || []).reduce((s, m) => s + (Number(m.valorCota) || 0), 0) * 100) / 100;
+  // Nº de unidades: o rateio de obra mostra o total previsto sem dizer quem pagou.
+  out.unidades = (d.moradores || []).length;
   out.moradores = [];
   out.lancamentos = (d.lancamentos || []).map(l => {
-    if (/receita/.test(l.tipo || '')) return { ...l, destino: '', descricao: 'Cota condominial', obs: '' };
+    if (/receita/.test(l.tipo || '')) {
+      const rt = l.rateio && (d.rateios || []).find(r => r.id === l.rateio);
+      return { ...l, destino: '', descricao: rt ? `Rateio: ${rt.nome}` : 'Cota condominial', obs: '' };
+    }
     if (l.origem === 'reembolso') return { ...l, descricao: 'Restituição de pagamento feito por fora' };
     return l;
   });

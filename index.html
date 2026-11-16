@@ -284,6 +284,10 @@ tr.atencao:hover td{background:color-mix(in srgb,var(--warn) 16%,transparent)}
 .pill.desp{background:var(--desp-soft);color:var(--desp)}
 .pill.warn{background:var(--warn-soft);color:var(--warn)}
 .pill.dup{background:var(--card);color:var(--muted)}
+.pill.obra{background:var(--warn-soft);color:var(--warn);margin-left:6px;vertical-align:1px}
+td.parc small{display:block;font-size:9.5px;font-weight:600;opacity:.8}
+.rateio-bloco+.rateio-bloco{border-top:1px solid var(--border)}
+.rateio-bloco h3{padding:12px 18px 0;font-size:12px;font-weight:800}
 
 .result{padding:15px 18px;font-size:12.5px;font-weight:600}
 .result ul{margin:8px 0 0;padding-left:18px;color:var(--muted);font-weight:500}
@@ -401,6 +405,10 @@ td.check{text-align:center;width:80px}
       <h2>Pagamentos a restituir <span class="status" id="reemb-status"></span></h2>
       <div class="scroll"><table id="tbl-reemb-resumo"></table></div>
     </div>
+    <div class="card" id="card-rateios" hidden>
+      <h2>Rateio extra da obra <span class="status" id="rateios-status"></span></h2>
+      <div id="rateios-resumo"></div>
+    </div>
     <div class="card">
       <h2>Demonstrativo financeiro <span class="status edit-only">Saldo inicial do ano: <a href="#" id="saldo-ini">definir</a></span></h2>
       <div class="scroll"><table id="tbl-resumo"></table></div>
@@ -411,6 +419,10 @@ td.check{text-align:center;width:80px}
     <div class="card">
       <h2>Cotas condominiais por apartamento <span class="status edit-only">Clique numa célula para registrar ou corrigir um pagamento</span></h2>
       <div class="scroll"><table id="tbl-cotas"></table></div>
+    </div>
+    <div class="card" id="card-rateios-aptos" hidden>
+      <h2>Rateio extra por apartamento <span class="status">Parcelas pagas à parte da cota — não entram na grade acima</span></h2>
+      <div id="rateios-aptos"></div>
     </div>
   </section>
 
@@ -545,6 +557,11 @@ td.check{text-align:center;width:80px}
       <h2>Categorias de despesa <span><button class="btn secondary small" id="btn-add-cat">Adicionar</button> <button class="btn small" id="btn-save-cats">Salvar categorias</button></span></h2>
       <div class="scroll"><table id="tbl-cats"></table></div>
     </div>
+    <div class="card">
+      <h2>Rateios extras (obras) <span><button class="btn secondary small" id="btn-add-rateio">Adicionar</button> <button class="btn small" id="btn-save-rateios">Salvar rateios</button></span></h2>
+      <div class="scroll"><table id="tbl-rateios"></table></div>
+      <div class="result status">Cobrança à parte da cota (ex.: pintura em 6 parcelas). Os depósitos marcados com o rateio saem da grade de cotas, da previsão e da análise, e ganham linha própria no demonstrativo. Na importação do extrato, crédito com o valor da parcela é marcado sozinho.</div>
+    </div>
   </section>
 </main>
 </div>
@@ -629,6 +646,8 @@ function ordenar(d){
   // codigo nunca precisar checar existencia.
   if(!Array.isArray(d.reembolsos)) d.reembolsos = [];
   if(!Array.isArray(d.recorrentes)) d.recorrentes = [];
+  if(!Array.isArray(d.rateios)) d.rateios = [];
+  d.rateios.sort((a,b)=> String(a.inicio||'').localeCompare(String(b.inicio||'')) || ordCmp.compare(a.nome||'', b.nome||''));
   d.recorrentes = [...new Set(d.recorrentes)].sort((a,b)=> ordCmp.compare(a||'', b||''));
   d.reembolsos.sort((a,b)=> String(a.data||'').localeCompare(String(b.data||'')));
   return d;
@@ -732,16 +751,62 @@ function partesDe(l){
 }
 const doAno = () => D.lancamentos.filter(l => l.data.startsWith(String(ANO)));
 
+// ---------- Rateios extras (obras) ----------
+// Cobrança à parte da cota, em parcelas iguais por apartamento (ex.: pintura do
+// prédio). O depósito continua sendo receita do apto — o dinheiro entra na
+// mesma conta —, mas com `rateio: <id>` ele sai da grade de cotas, da previsão
+// e da análise (senão o mês aparece como "cota paga a mais" e a média de
+// arrecadação infla). Despesa com `rateio` é o pagamento da obra.
+// Configuração em D.rateios: {id, nome, parcelas, valorParcela, inicio:'AAAA-MM'}.
+const TOL_RATEIO = 0.05; // centavos de arredondamento do rateio (602,78 x 602,79)
+const rateiosDe = () => Array.isArray(D.rateios) ? D.rateios : [];
+const rateioPorId = id => rateiosDe().find(r => r.id === id);
+const ehRateio = l => !!(l && l.rateio && rateioPorId(l.rateio));
+const rotuloObra = r => `Obra · ${r.nome}`;
+const parcelaRateio = v => rateiosDe().find(r => (+r.valorParcela||0) > 0 && Math.abs((+r.valorParcela) - (+v||0)) <= TOL_RATEIO);
+function k0Rateio(r){ const m = String(r.inicio||'').match(/^(\d{4})-(\d{2})/); return m ? (+m[1])*12 + (+m[2]) - 1 : null; }
+function rateioNoAno(r, ano){
+  const k0 = k0Rateio(r); if(k0 === null) return true;
+  const kf = k0 + Math.max(1, +r.parcelas||1) - 1;
+  return Math.floor(k0/12) <= ano && Math.floor(kf/12) >= ano;
+}
+function calcRateio(r){
+  const n = Math.max(0, +r.parcelas||0), vp = +r.valorParcela||0, k0 = k0Rateio(r);
+  const kH = hoje.getFullYear()*12 + hoje.getMonth();
+  const vencidas = k0 === null ? n : Math.max(0, Math.min(n, kH - k0 + 1));
+  const pagoApto = {}, pagtos = {};
+  let arrecadado = 0, gasto = 0;
+  for (const l of D.lancamentos){
+    if (l.rateio !== r.id) continue;
+    if (/receita/.test(l.tipo)){ arrecadado += l.valor; pagoApto[l.destino] = (pagoApto[l.destino]||0) + l.valor; (pagtos[l.destino] ||= []).push(l); }
+    else gasto += l.valor;
+  }
+  const aptos = D.moradores.map(m => {
+    const pago = r2(pagoApto[m.apto]||0);
+    const quitadas = vp ? Math.min(n, Math.floor((pago + TOL_RATEIO*Math.max(1,n)) / vp)) : 0;
+    const lista = (pagtos[m.apto]||[]).slice().sort((a,b)=>a.data.localeCompare(b.data));
+    // Falta conta parcelas, nao centavos: quem pagou 602,78 nao deve 0,01.
+    return { m, pago, quitadas, lista, falta: r2(Math.max(0, (n - quitadas) * vp)), atraso: Math.max(0, vencidas - quitadas) };
+  });
+  // Sem cadastro por apto (acesso geral), o total vem do servidor.
+  const unidades = D.moradores.length || (+D.unidades||0);
+  const previsto = r2(n * vp * unidades);
+  const previstoAteAgora = r2(vencidas * vp * unidades);
+  const concluido = vencidas >= n && arrecadado >= previsto - TOL_RATEIO*n*Math.max(1,unidades) && Math.abs(arrecadado - gasto) < 0.01;
+  return { r, n, vp, k0, vencidas, arrecadado: r2(arrecadado), gasto: r2(gasto), saldo: r2(arrecadado - gasto), previsto, previstoAteAgora, aptos, unidades, concluido };
+}
+
 function calc(){
   const L = doAno();
   const rec = Array(12).fill(0), desp = Array(12).fill(0), noMes = Array(12).fill(0), atraso = Array(12).fill(0);
-  const cotas = {}, despCat = {}, origemDiv = {};
+  const cotas = {}, despCat = {}, origemDiv = {}, rateioRec = {}, rateioDesp = {};
   D.moradores.forEach(m => cotas[m.apto] = Array(12).fill(0));
   D.categorias.forEach(c => despCat[c] = Array(12).fill(0));
   for (const l of L) {
     const mp = mesPag(l);
     if (l.tipo === 'receita') {
       rec[mp] += l.valor;
+      if (ehRateio(l)) { (rateioRec[l.rateio] ||= Array(12).fill(0))[mp] += l.valor; continue; }
       if (!cotas[l.destino]) cotas[l.destino] = Array(12).fill(0);
       const div = !!partesValidas(l);
       for (const p of partesDe(l)) {
@@ -752,6 +817,7 @@ function calc(){
       }
     } else {
       desp[mp] += l.valor;
+      if (ehRateio(l)) { (rateioDesp[l.rateio] ||= Array(12).fill(0))[mp] += l.valor; continue; }
       if (!despCat[l.destino]) despCat[l.destino] = Array(12).fill(0);
       despCat[l.destino][mp] += l.valor;
     }
@@ -761,7 +827,7 @@ function calc(){
   let s = ini;
   for (let i=0;i<12;i++){ saldoAnt.push(s); if (s !== undefined && s !== null) s = r2(s + rec[i] - desp[i]); saldo.push(s); }
   let ult = -1; for (let i=0;i<12;i++) if (rec[i]||desp[i]) ult = i;
-  return { rec, desp, noMes, atraso, cotas, origemDiv, despCat, saldoAnt, saldo, ult, temIni: ini !== undefined && ini !== null };
+  return { rec, desp, noMes, atraso, cotas, origemDiv, despCat, rateioRec, rateioDesp, saldoAnt, saldo, ult, temIni: ini !== undefined && ini !== null };
 }
 
 // Saldo consolidado da conta: parte do saldo inicial do ano mais antigo
@@ -803,6 +869,8 @@ function calcPrevisao(){
     const k = kMes(+l.data.slice(0,4), +l.data.slice(5,7)-1);
     if (k < kMin) kMin = k;
     if (l.data > ultimo) ultimo = l.data;
+    // Rateio de obra nao e receita nem despesa do dia a dia do condominio.
+    if (ehRateio(l)) continue;
     if (l.tipo === 'receita'){ recPorMes[k] = (recPorMes[k]||0) + l.valor; continue; }
     const v = (porCat[l.destino] = porCat[l.destino] || {});
     v[k] = (v[k]||0) + l.valor;
@@ -835,7 +903,7 @@ function calcPrevisao(){
   const cotaTotal = r2(porApto ? D.moradores.reduce((s,m)=>s+(+m.valorCota||0),0) : (+D.cotaMensalTotal||0));
   const recebido = {};
   for (const l of D.lancamentos){
-    if (l.tipo !== 'receita' || !l.data.startsWith(String(anoH))) continue;
+    if (l.tipo !== 'receita' || !l.data.startsWith(String(anoH)) || ehRateio(l)) continue;
     const mp = +l.data.slice(5,7)-1;
     for (const p of partesDe(l)) {
       const mr = mesIdx(p.mesRef) >= 0 ? mesIdx(p.mesRef) : mp;
@@ -1065,7 +1133,7 @@ document.addEventListener('click', e => {
 // ---------- Render ----------
 function renderTudo(){
   $('#subtitulo').textContent = `Contas do condomínio · ${ANO}`;
-  renderResumo(); renderDivergencias(); renderResumoReemb(); renderCotas(); renderDespesas(); renderAnalise(); renderReembolsos(); renderLanc(); renderCadastros(); fillMesRef(); atualizarInterPeriodo();
+  renderResumo(); renderDivergencias(); renderResumoReemb(); renderRateios(); renderCotas(); renderDespesas(); renderAnalise(); renderReembolsos(); renderLanc(); renderCadastros(); fillMesRef(); atualizarInterPeriodo();
 }
 const thMeses = () => MESES.map((m,i)=>`<th class="${i===hoje.getMonth()&&ANO===hoje.getFullYear()?'mes-atual':''}">${m}</th>`).join('');
 const tdVals = (vals, cls) => vals.map(v=>{ v=v||0; return `<td class="${v===0?'zero':(cls||(v<0?'neg':''))}">${v===0?'—':fmtN(v)}</td>`; }).join('');
@@ -1158,11 +1226,14 @@ function renderResumo(){
   }).join('');
   renderPrevisao(P);
   const tot = a => a.reduce((s,v)=>s+(v||0),0);
+  const rtAno = rateiosDe().filter(r => rateioNoAno(r, ANO) || (C.rateioRec[r.id]||[]).some(Boolean) || (C.rateioDesp[r.id]||[]).some(Boolean));
   const linhas = [
     ['Saldo do mês anterior', C.saldoAnt.map(v=>v??0)],
     [ROW_ATRASO, C.atraso, 'rec'], [ROW_NO_MES, C.noMes, 'rec'],
+    ...rtAno.map(r=>[`1.3 - Rateio extra: ${r.nome}`, C.rateioRec[r.id]||Array(12).fill(0), 'rec']),
     ['Total das receitas', C.rec, 'rec'],
     ...D.categorias.map(c=>[c, C.despCat[c]||Array(12).fill(0), 'desp']),
+    ...rtAno.map(r=>[rotuloObra(r), C.rateioDesp[r.id]||Array(12).fill(0), 'desp']),
     ['Total das despesas', C.desp, 'desp'],
     ['Resultado do mês', MESES.map((_,i)=>r2(C.rec[i]-C.desp[i]))],
     ['Saldo atual', C.saldo.map(v=>v??0)],
@@ -1176,6 +1247,54 @@ $('#saldo-ini').onclick = async e => {
   const s = prompt(`Saldo da conta no fim do dia 31/12/${ANO-1} (R$).\n\nNo extrato, use o saldo do último dia de ${ANO-1} — não o de 01/01/${ANO}, que já inclui as movimentações daquele dia.`, fmtN((D.saldoInicial||{})[ANO]||0)); if(s===null) return;
   try { await salvar(d=>{ d.saldoInicial = d.saldoInicial||{}; d.saldoInicial[ANO] = parseBR(s); }, `Saldo inicial ${ANO}`); toast('Saldo inicial salvo'); } catch(err){ toast(err.message,true); }
 };
+
+function renderRateios(){
+  const lista = rateiosDe().map(calcRateio);
+  const ativos = lista.filter(x => !x.concluido);
+  const G = calcGeral();
+  // Resumo: visivel para todos, so totais.
+  $('#card-rateios').hidden = !ativos.length;
+  if (ativos.length){
+    const reservado = r2(ativos.reduce((s,x)=>s+x.saldo,0));
+    $('#rateios-status').textContent = G.ok ? `saldo da conta ${fmt(G.saldo)} · ${fmt(reservado)} são da obra · livre ${fmt(r2(G.saldo - reservado))}` : '';
+    $('#rateios-resumo').innerHTML = ativos.map(x => {
+      const prox = x.vencidas < x.n && x.k0 !== null ? rotMes(x.k0 + x.vencidas) : null;
+      const sub = `${x.n} parcelas de ${fmt(x.vp)} por apto` + (x.k0 !== null ? ` · ${rotMes(x.k0)} a ${rotMes(x.k0 + x.n - 1)}` : '');
+      const falta = r2(Math.max(0, x.previsto - x.arrecadado));
+      return `<div class="rateio-bloco"><h3>${esc(x.r.nome)} <span class="status">${esc(sub)}</span></h3>
+      <div class="kpis">
+        <div class="kpi"><span>Arrecadado</span><b class="pos">${fmt(x.arrecadado)}</b><small>${x.previsto ? `de ${fmt(x.previsto)} no total · falta ${fmt(falta)}` : ''}</small></div>
+        <div class="kpi"><span>Parcela atual</span><b>${x.vencidas}ª de ${x.n}</b><small>${x.previstoAteAgora ? `esperado até agora ${fmt(x.previstoAteAgora)}` : 'ainda não começou'}${prox ? ` · próxima em ${prox}` : ''}</small></div>
+        <div class="kpi"><span>Pago na obra</span><b class="${x.gasto?'neg':'off'}">${fmt(x.gasto)}</b><small>${esc(rotuloObra(x.r))}</small></div>
+        <div class="kpi"><span>Saldo reservado da obra</span><b class="${x.saldo<0?'neg':''}">${fmt(x.saldo)}</b><small>arrecadado − pago na obra</small></div>
+      </div></div>`;
+    }).join('') + `<div class="result status">O rateio entra na mesma conta do condomínio, mas não é cota: fica fora da grade de cotas, da previsão e da análise de reajuste, e tem linha própria no demonstrativo.</div>`;
+  }
+  // Aba Cotas (admin): parcela por apartamento.
+  const comAptos = IS_ADMIN && D.moradores.length ? ativos : [];
+  $('#card-rateios-aptos').hidden = !comAptos.length;
+  if (!comAptos.length) return;
+  $('#rateios-aptos').innerHTML = comAptos.map(x => {
+    const cab = Array.from({length:x.n}, (_,j)=>`<th>${j+1}ª${x.k0!==null?` · ${MESES[(x.k0+j)%12]}`:''}</th>`).join('');
+    const linhas = x.aptos.map(a => {
+      const cels = Array.from({length:x.n}, (_,j)=>{
+        if (j < a.quitadas){
+          const l = a.lista.length === a.quitadas ? a.lista[j] : null;
+          return `<td class="parc pago" title="Parcela ${j+1} paga${l ? ` em ${fmtData(l.data)} · ${esc(l.descricao)}` : ''}">${fmtN(l ? l.valor : x.vp)}${l ? `<small>${fmtData(l.data).slice(0,5)}</small>` : ''}</td>`;
+        }
+        if (j < x.vencidas) return `<td class="parc pend">pendente</td>`;
+        return `<td class="zero">—</td>`;
+      }).join('');
+      return `<tr><td><b>${esc(a.m.apto)}</b> <span class="status">${esc(a.m.nome)}</span></td>${cels}<td><b>${fmtN(a.pago)}</b></td><td class="${a.falta?'':'zero'}">${a.falta?fmtN(a.falta):'—'}</td></tr>`;
+    }).join('');
+    const tp = r2(x.aptos.reduce((s,a)=>s+a.pago,0)), tf = r2(x.aptos.reduce((s,a)=>s+a.falta,0));
+    const estranhos = x.aptos.filter(a => a.quitadas > x.vencidas).map(a=>a.m.apto);
+    return `<div class="rateio-bloco"><h3>${esc(x.r.nome)}</h3><div class="scroll"><table>
+      <thead><tr><th>Apto</th>${cab}<th>Pago</th><th>Falta</th></tr></thead><tbody>${linhas}</tbody>
+      <tfoot><tr><td>Total</td><td colspan="${x.n}"></td><td>${fmtN(tp)}</td><td>${fmtN(tf)}</td></tr></tfoot></table></div>
+      ${estranhos.length ? `<div class="result status">⚠ Apto ${estranhos.join(', ')} com mais parcelas pagas do que as vencidas — confira se algum depósito foi atribuído ao apartamento errado.</div>` : ''}</div>`;
+  }).join('');
+}
 
 function renderCotas(){
   const C = calc();
@@ -1252,9 +1371,42 @@ let EDIT_ID = null, EDIT_BUF = null;
 function optDestino(x){
   return /receita/.test(x.tipo)
     ? D.moradores.map(m=>`<option value="${esc(m.apto)}" ${m.apto===x.destino?'selected':''}>${esc(m.apto)} · ${esc(m.nome)}</option>`).join('')
-    : D.categorias.map(c=>`<option ${c===x.destino?'selected':''}>${esc(c)}</option>`).join('');
+    : optCategorias(x);
+}
+// Categorias + uma opcao "Obra · <rateio>" por rateio, em ordem alfabetica.
+function optCategorias(x){
+  const ops = D.categorias.map(c=>({ v:c, t:c, sel: !x.rateio && c===x.destino }))
+    .concat(rateiosDe().map(r=>({ v:'@rateio:'+r.id, t:rotuloObra(r), sel: x.rateio===r.id })))
+    .sort((a,b)=>ordCmp.compare(a.t,b.t));
+  return ops.map(o=>`<option value="${esc(o.v)}" ${o.sel?'selected':''}>${esc(o.t)}</option>`).join('');
+}
+function optTipo(x){
+  const rec = /receita/.test(x.tipo);
+  return `<option value="receita" ${rec&&!x.rateio?'selected':''}>Cota</option>`
+    + `<option value="despesa" ${rec?'':'selected'}>Despesa</option>`
+    + rateiosDe().map(r=>`<option value="rateio:${esc(r.id)}" ${rec&&x.rateio===r.id?'selected':''}>Rateio: ${esc(r.nome)}</option>`).join('');
+}
+// Troca de tipo num rascunho (edicao ou importacao): "rateio:<id>" e uma cota
+// marcada com o rateio. So zera o destino quando muda de familia (apto x categoria).
+function aplicarTipo(o, v){
+  const eraRec = /receita/.test(o.tipo);
+  if(String(v).startsWith('rateio:')){ o.tipo = 'receita'; o.rateio = v.slice(7); delete o.partes; }
+  else { o.tipo = v; delete o.rateio; }
+  const ehRec = /receita/.test(o.tipo);
+  if(eraRec !== ehRec) o.destino = '';
+  return ehRec;
+}
+function aplicarDestinoDesp(o, v){
+  if(String(v).startsWith('@rateio:')){ const r = rateioPorId(v.slice(8)); o.rateio = r.id; o.destino = rotuloObra(r); }
+  else { delete o.rateio; o.destino = v; }
 }
 function destinoLeitura(x){
+  if(ehRateio(x)){
+    const r = rateioPorId(x.rateio);
+    return /receita/.test(x.tipo)
+      ? `${x.destino ? `Apto ${esc(x.destino)}` : 'Rateio'}<span class="pill obra" title="Parcela do rateio, à parte da cota">Rateio ${esc(r.nome)}</span>`
+      : `${esc(rotuloObra(r))}<span class="pill obra">obra</span>`;
+  }
   if(!/receita/.test(x.tipo)) return esc(x.destino);
   const quem = x.destino ? `Apto ${esc(x.destino)}` : 'Cota';
   const p = partesValidas(x);
@@ -1311,9 +1463,9 @@ function rowLancEdicao(x){
     <td><input type="date" data-e="data" value="${esc(x.data)}"></td>
     <td class="desc"><input type="text" data-e="descricao" value="${esc(x.descricao)}"></td>
     <td style="text-align:left" class="campos-destino">
-      <select class="inline" data-e="tipo"><option value="receita" ${rec?'selected':''}>Cota</option><option value="despesa" ${rec?'':'selected'}>Despesa</option></select>
+      <select class="inline" data-e="tipo">${optTipo(x)}</select>
       <select class="inline" data-e="destino"><option value="">Escolher…</option>${optDestino(x)}</select>
-      ${rec && !Array.isArray(x.partes)?`<select class="inline" data-e="mesRef">${MESES.map(m=>`<option ${m===x.mesRef?'selected':''}>${m}</option>`).join('')}</select>
+      ${rec && !x.rateio && !Array.isArray(x.partes)?`<select class="inline" data-e="mesRef">${MESES.map(m=>`<option ${m===x.mesRef?'selected':''}>${m}</option>`).join('')}</select>
       <button class="lk" data-dividir="1" title="Um pagamento que quita mais de um mês">⇆ Dividir entre meses</button>`:''}
       ${rec && Array.isArray(x.partes)?editorPartes(x):''}
     </td>
@@ -1348,8 +1500,13 @@ function renderLanc(){
     }
     const k = e.target.dataset.e; if(!k || !EDIT_BUF) return;
     if(k==='valor' && Array.isArray(EDIT_BUF.partes)){ EDIT_BUF.valor = Number(e.target.value)||0; atualizarSomaPartes(); return; }
+    if(k==='tipo'){
+      if(!aplicarTipo(EDIT_BUF, e.target.value)){ delete EDIT_BUF.mesRef; delete EDIT_BUF.partes; }
+      else EDIT_BUF.mesRef = EDIT_BUF.mesRef || MESES[+String(EDIT_BUF.data).slice(5,7)-1];
+      renderLanc(); return;
+    }
+    if(k==='destino' && !/receita/.test(EDIT_BUF.tipo)){ aplicarDestinoDesp(EDIT_BUF, e.target.value); return; }
     EDIT_BUF[k] = e.target.type==='number' ? Number(e.target.value)||0 : e.target.value;
-    if(k==='tipo'){ EDIT_BUF.destino=''; if(EDIT_BUF.tipo==='despesa'){ delete EDIT_BUF.mesRef; delete EDIT_BUF.partes; } else EDIT_BUF.mesRef = EDIT_BUF.mesRef || MESES[+String(EDIT_BUF.data).slice(5,7)-1]; renderLanc(); }
   };
 
   $('#tbl-lanc').onclick = async e => {
@@ -1395,6 +1552,7 @@ function renderLanc(){
         const mp = MESES[+editado.data.slice(5,7)-1];
         editado.mesRef = partes.some(p=>p.mesRef===mp) ? mp : partes[partes.length-1].mesRef;
       } else delete editado.partes;
+      if(!editado.rateio) delete editado.rateio; else delete editado.partes;
       // Sai do modo de edicao ANTES de gravar: salvar() redesenha a tabela ao
       // final, e a linha voltaria a aparecer como formulario.
       EDIT_ID = null; EDIT_BUF = null;
@@ -1424,7 +1582,10 @@ function renderCadastros(){
   $('#tbl-moradores').innerHTML = `<thead><tr><th>Apto</th><th style="text-align:left">Nome</th><th style="text-align:left">Apelidos no extrato</th><th>Cota (R$)</th><th></th></tr></thead><tbody>${D.moradores.map(rowMorador).join('')}</tbody>`;
   $('#tbl-regras').innerHTML = `<thead><tr><th style="text-align:left">Palavra-chave</th><th style="text-align:left">Categoria</th><th></th></tr></thead><tbody>${D.regras.map(rowRegra).join('')}</tbody>`;
   $('#tbl-cats').innerHTML = `<thead><tr><th style="text-align:left">Categoria</th><th></th></tr></thead><tbody>${D.categorias.map(rowCat).join('')}</tbody>`;
+  $('#tbl-rateios').innerHTML = `<thead><tr><th style="text-align:left">Nome</th><th>Parcelas</th><th>Valor da parcela por apto (R$)</th><th>1ª parcela</th><th></th></tr></thead><tbody>${rateiosDe().map(rowRateio).join('')}</tbody>`;
 }
+function rowRateio(r={}){ return `<tr><td><input type="hidden" data-k="id" value="${esc(r.id||'')}"><input type="text" value="${esc(r.nome||'')}" data-k="nome" placeholder="Ex.: Pintura"></td><td><input type="number" step="1" min="1" value="${r.parcelas||''}" data-k="parcelas"></td><td><input type="number" step="0.01" value="${r.valorParcela||''}" data-k="valorParcela"></td><td><input type="month" value="${esc(r.inicio||'')}" data-k="inicio"></td><td class="acao"><button class="x" title="Remover">×</button></td></tr>`; }
+const slugRateio = s => norm(s).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'') || 'rateio';
 function rowMorador(m={}){ return `<tr><td><input type="text" class="apto" value="${esc(m.apto||'')}" data-k="apto"></td><td><input type="text" value="${esc(m.nome||'')}" data-k="nome"></td><td><input type="text" value="${esc(m.apelidos||'')}" data-k="apelidos"></td><td><input type="number" step="0.01" value="${m.valorCota||''}" data-k="valorCota"></td><td class="acao"><button class="x" title="Remover">×</button></td></tr>`; }
 function rowRegra(r={}){ return `<tr><td><input type="text" value="${esc(r.chave||'')}" data-k="chave"></td><td><select data-k="categoria" class="inline">${D.categorias.map(c=>`<option ${c===r.categoria?'selected':''}>${esc(c)}</option>`).join('')}</select></td><td class="acao"><button class="x" title="Remover">×</button></td></tr>`; }
 function rowCat(c=''){ return `<tr><td><input type="text" value="${esc(c)}" data-k="nome" placeholder="2.14 - Nova categoria"></td><td class="acao"><button class="x" title="Remover">×</button></td></tr>`; }
@@ -1434,6 +1595,21 @@ document.addEventListener('click', e => { const x=e.target.closest('#tab-cadastr
 $('#btn-add-morador').onclick = ()=> addRow('#tbl-moradores', rowMorador());
 $('#btn-add-regra').onclick = ()=> addRow('#tbl-regras', rowRegra());
 $('#btn-add-cat').onclick = ()=> addRow('#tbl-cats', rowCat());
+$('#btn-add-rateio').onclick = ()=> addRow('#tbl-rateios', rowRateio());
+$('#btn-save-rateios').onclick = async ()=>{
+  const usados = new Set();
+  const rows = readRows('#tbl-rateios').filter(r=>r.nome).map(r=>{
+    let id = r.id || slugRateio(r.nome), base = id, i = 2;
+    while(usados.has(id)) id = `${base}-${i++}`;
+    usados.add(id);
+    return { id, nome: r.nome, parcelas: Math.max(1, Math.round(+r.parcelas||1)), valorParcela: r2(+r.valorParcela||0), inicio: r.inicio };
+  });
+  if(rows.some(r=>!(r.valorParcela>0))){ toast('Informe o valor da parcela de cada rateio', true); return; }
+  const removidos = rateiosDe().filter(r=>!usados.has(r.id));
+  const afetados = D.lancamentos.filter(l=>removidos.some(r=>r.id===l.rateio)).length;
+  if(afetados && !confirm(`${afetados} lançamento(s) estão marcados com rateio removido e voltarão a contar como cota/despesa comum. Continuar?`)) return;
+  try{ await salvar(d=>{ d.rateios = rows; }, 'Atualiza rateios extras'); toast('Rateios salvos'); }catch(e){ toast(e.message,true); }
+};
 $('#btn-save-moradores').onclick = async ()=>{ const rows=readRows('#tbl-moradores').filter(m=>m.apto); try{ await salvar(d=>{ d.moradores=rows; }, 'Atualiza moradores'); toast('Moradores salvos'); }catch(e){toast(e.message,true);} };
 $('#btn-save-regras').onclick = async ()=>{ const rows=readRows('#tbl-regras').filter(r=>r.chave); try{ await salvar(d=>{ d.regras=rows; }, 'Atualiza regras'); toast('Regras salvas'); }catch(e){toast(e.message,true);} };
 $('#btn-save-cats').onclick = async ()=>{ const rows=readRows('#tbl-cats').map(r=>r.nome).filter(Boolean); try{ await salvar(d=>{ d.categorias=rows; d.recorrentes=(d.recorrentes||[]).filter(c=>rows.includes(c)); }, 'Atualiza categorias'); toast('Categorias salvas'); }catch(e){toast(e.message,true);} };
@@ -2112,6 +2288,9 @@ function classificar(t){
     }
     if(!l.destino){ const C=calc(); const mi=mesIdx(l.mesRef); const cand=D.moradores.filter(m=>Math.abs(m.valorCota-t.valor)<0.01&&!(C.cotas[m.apto]||[])[mi]); if(cand.length===1){ l.destino=cand[0].apto; l.motivo='valor da cota (confirmar)'; } }
     if(!l.destino) l.motivo='pagador não reconhecido';
+    // Credito com o valor da parcela de um rateio e o deposito da obra, nao a cota.
+    const rt = parcelaRateio(t.valor);
+    if(rt){ l.rateio = rt.id; l.motivo = `rateio ${rt.nome} · ${l.motivo}`; }
   } else {
     const regra=D.regras.find(r=>r.chave&&d.includes(norm(r.chave)));
     if(regra){ l.destino=regra.categoria; l.motivo=`regra “${regra.chave}”`; } else l.motivo='sem regra — escolha a categoria';
@@ -2136,11 +2315,11 @@ function alocarMesRef(lista){
   const pago = {};                                     // pago[apto][ano][mes] = total
   const marca = (apto, ano, i, v) => { ((pago[apto] ||= {})[ano] ||= Array(12).fill(0))[i] += v; };
   for(const l of D.lancamentos){
-    if(!/receita/.test(l.tipo)) continue;
+    if(!/receita/.test(l.tipo) || ehRateio(l)) continue;
     for(const p of partesDe(l)){ const i = mesIdx(p.mesRef); if(i >= 0) marca(l.destino, +l.data.slice(0,4), i, +p.valor); }
   }
   for(const l of [...lista].sort((a,b)=>a.data.localeCompare(b.data))){
-    if(l.tipo!=='receita' || !l.destino || l.jaLancado) continue;
+    if(l.tipo!=='receita' || !l.destino || l.jaLancado || l.rateio) continue;
     const ano = +l.data.slice(0,4), mp = mesIdx(l.mesPag);
     const meses = (pago[l.destino]||{})[ano] || Array(12).fill(0);
     if(meses[mp] > 0){
@@ -2182,22 +2361,22 @@ function renderImport(){
     if(b.dataset.f==='atencao') b.textContent = nAtencao ? `Precisam de atenção · ${nAtencao}` : 'Precisam de atenção';
   });
   const optApto=v=>`<option value="">Escolher apto…</option>`+D.moradores.map(m=>`<option value="${esc(m.apto)}" ${m.apto===v?'selected':''}>${esc(m.apto)} · ${esc(m.nome)}</option>`).join('');
-  const optCat=v=>`<option value="">Escolher categoria…</option>`+D.categorias.map(c=>`<option ${c===v?'selected':''}>${esc(c)}</option>`).join('');
+  const optCat=l=>`<option value="">Escolher categoria…</option>`+optCategorias(l);
   $('#tbl-import').innerHTML=`<thead><tr><th style="text-align:center"><input type="checkbox" id="chk-all" ${IMP.every(l=>l.incluir||l.jaLancado)?'checked':''}></th><th>Data</th><th style="text-align:left">Descrição</th><th>Valor</th><th style="text-align:left">Tipo</th><th style="text-align:left">Destino</th><th style="text-align:left">Mês ref.</th><th style="text-align:left">Classificação</th></tr></thead>
   <tbody>${visiveis.map(({l,i})=>`<tr class="${l.incluir?'':'off'}${precisaAtencao(l)?' atencao':''}" data-i="${i}">
     <td style="text-align:center"><input type="checkbox" data-k="incluir" ${l.incluir?'checked':''} ${l.jaLancado?'disabled':''}></td>
     <td>${fmtData(l.data)}</td><td class="desc">${esc(l.descricao)}</td>
     <td class="${l.tipo==='receita'?'rec':'desp'}">${l.credito?'+':'−'} ${fmtN(l.valor)}</td>
-    <td style="text-align:left"><select class="inline" data-k="tipo"><option value="receita" ${l.tipo==='receita'?'selected':''}>Cota</option><option value="despesa" ${l.tipo==='despesa'?'selected':''}>Despesa</option></select></td>
-    <td style="text-align:left"><select class="inline" data-k="destino">${l.tipo==='receita'?optApto(l.destino):optCat(l.destino)}</select></td>
-    <td style="text-align:left">${l.tipo==='receita'?`<select class="inline" data-k="mesRef">${MESES.map(m=>`<option ${m===l.mesRef?'selected':''}>${m}</option>`).join('')}</select>`:`<span class="status">${l.mesPag}</span>`}</td>
+    <td style="text-align:left"><select class="inline" data-k="tipo">${optTipo(l)}</select></td>
+    <td style="text-align:left"><select class="inline" data-k="destino">${l.tipo==='receita'?optApto(l.destino):optCat(l)}</select></td>
+    <td style="text-align:left">${l.rateio&&l.tipo==='receita'?'<span class="status">parcela</span>':l.tipo==='receita'?`<select class="inline" data-k="mesRef">${MESES.map(m=>`<option ${m===l.mesRef?'selected':''}>${m}</option>`).join('')}</select>`:`<span class="status">${l.mesPag}</span>`}</td>
     <td style="text-align:left">${l.jaLancado?'<span class="pill dup">já lançado</span>':(l.destino?`<span class="pill ${l.tipo==='receita'?'rec':'desp'}">${esc(l.motivo)}</span>`:`<span class="pill warn">⚠ ${esc(l.motivo)}</span>`)}</td>
   </tr>`).join('')}</tbody>`;
   if(!visiveis.length) $('#tbl-import').innerHTML = `<tr><td class="empty" style="text-align:center">Nenhuma linha neste filtro.</td></tr>`;
   atualizarImpStatus();
   $('#chk-all').onchange=e=>{ IMP.forEach(l=>{ if(!l.jaLancado) l.incluir=e.target.checked; }); renderImport(); };
   $('#tbl-import').onchange=e=>{ const tr=e.target.closest('tr[data-i]'); if(!tr) return; const l=IMP[tr.dataset.i]; const k=e.target.dataset.k;
-    if(k==='incluir') l.incluir=e.target.checked; else if(k==='tipo'){ l.tipo=e.target.value; l.destino=''; l.motivo='definido manualmente'; } else if(k==='destino'){ l.destino=e.target.value; l.motivo='definido manualmente'; } else if(k==='mesRef'){ l.mesRef=e.target.value; l.mesRefManual=true; }
+    if(k==='incluir') l.incluir=e.target.checked; else if(k==='tipo'){ aplicarTipo(l, e.target.value); l.motivo='definido manualmente'; } else if(k==='destino'){ if(l.tipo==='receita') l.destino=e.target.value; else aplicarDestinoDesp(l, e.target.value); l.motivo='definido manualmente'; } else if(k==='mesRef'){ l.mesRef=e.target.value; l.mesRefManual=true; }
     renderImport(); };
 }
 function atualizarImpStatus(){
@@ -2211,7 +2390,7 @@ $('#imp-filtros').onclick = e => {
   FILTRO_IMP = b.dataset.f; renderImport();
 };
 $('#btn-lancar').onclick=async()=>{
-  const novos=IMP.filter(l=>l.incluir&&l.destino).map(l=>({id:l.id,data:l.data,descricao:l.descricao,valor:l.valor,tipo:l.tipo,destino:l.destino,mesRef:l.tipo==='receita'?l.mesRef:l.mesPag,origem:l.origem||'extrato'}));
+  const novos=IMP.filter(l=>l.incluir&&l.destino).map(l=>({id:l.id,data:l.data,descricao:l.descricao,valor:l.valor,tipo:l.tipo,destino:l.destino,mesRef:l.tipo==='receita'?l.mesRef:l.mesPag,origem:l.origem||'extrato',...(l.rateio?{rateio:l.rateio}:{})}));
   if(!novos.length) return;
   if(!confirm(`Lançar ${novos.length} transações?`)) return;
   $('#btn-lancar').disabled=true; $('#btn-lancar').textContent='Lançando…';
