@@ -87,7 +87,7 @@ nav button[aria-selected="true"]{color:var(--accent);border-bottom-color:var(--a
 .x:hover{background:var(--desp-soft);color:var(--desp)}
 
 /* ══ FORM ══ */
-input[type=text],input[type=number],input[type=password],input[type=email],input[type=date],select{
+input[type=text],input[type=number],input[type=password],input[type=email],input[type=date],input[type=month],select{
   width:100%;background:var(--card);border:1px solid var(--border-ctrl);color:var(--text);
   padding:9px 12px;border-radius:10px;font-size:13px;outline:none;transition:border-color .2s;min-width:0}
 input:focus,select:focus{border-color:var(--accent)}
@@ -184,6 +184,7 @@ td.acao{text-align:center;width:auto;white-space:nowrap}
 tr.editando td{background:var(--card-deep)}
 tr.editando .campos-destino{display:flex;gap:6px;flex-wrap:wrap}
 tr.editando td input[type=date]{width:auto;min-width:140px}
+td input[type=month]{width:auto;min-width:150px}
 select.inline{padding:5px 8px;font-size:12px;max-width:240px;border-radius:8px}
 /* Dentro da tabela o select herdaria width:100% da celula e ficaria estreito
    demais para ler "202 - Guilherme e Ionara" ou "Conservadora". */
