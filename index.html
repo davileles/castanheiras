@@ -1568,8 +1568,8 @@ function renderLanc(){
       const l = D.lancamentos.find(x=>x.id===id);
       // Se este lancamento quitava um reembolso, a pendencia tem de voltar a
       // existir — senao o morador fica sem a restituicao e sem o registro dela.
-      const lig = rbLista().find(x=>x.lancamentoId===id);
-      if(!confirm(`Excluir "${l.descricao}" de ${fmtN(l.valor)}?` + (lig ? '\n\nA pendência de reembolso vinculada volta para "em aberto".' : ''))) return;
+      const lig = rbLista().filter(x=>x.lancamentoId===id).length;
+      if(!confirm(`Excluir "${l.descricao}" de ${fmtN(l.valor)}?` + (lig ? (lig > 1 ? `\n\nAs ${lig} pendências de reembolso vinculadas voltam para "em aberto".` : '\n\nA pendência de reembolso vinculada volta para "em aberto".') : ''))) return;
       try { await salvar(d=>{
         d.lancamentos = d.lancamentos.filter(x=>x.id!==id);
         (d.reembolsos||[]).forEach(rb=>{ if(rb.lancamentoId===id){ rb.status='aberto'; delete rb.quitadoEm; delete rb.lancamentoId; } });
@@ -1707,6 +1707,8 @@ const RB_OUTRO = '__outro';
 let RB_FILTRO = 'aberto';
 const rbLista = () => { if(!Array.isArray(D.reembolsos)) D.reembolsos = []; return D.reembolsos; };
 const rbAberto = r => r.status !== 'quitado';
+// Quanto de um debito do extrato ainda nao foi usado para quitar pendencias.
+const rbLivre = (lista, l) => r2((+l.valor||0) - (lista||[]).filter(x=>x.lancamentoId===l.id).reduce((s,x)=>s+(+x.valor||0),0));
 // Parcelado: cada parcela e uma pendencia propria (mesmo `grupo`) com o mes em
 // que deve ser restituida — a 1a no mes da compra, as demais nos seguintes.
 // Quitar, reabrir e vincular ao extrato continuam valendo parcela a parcela,
@@ -2001,14 +2003,20 @@ function fecharModal(){ const m = $('#rb-modal'); m.hidden = true; m.innerHTML =
 function abrirQuitacao(id){
   const r = rbLista().find(x=>x.id===id); if(!r) return;
   // Candidatos a vinculo: despesas ja no extrato, a partir da data do
-  // pagamento, que nenhuma outra pendencia esteja usando. Valor igual sobe.
-  const usados = new Set(rbLista().filter(x=>x.lancamentoId).map(x=>x.lancamentoId));
-  const igual = l => Math.abs((+l.valor||0) - (+r.valor||0)) < 0.01;
+  // pagamento, com saldo livre que cubra esta pendencia. Um debito pode
+  // quitar varias pendencias (ex.: um Pix de R$ 1.000 devolvendo 10 de
+  // R$ 100), mas a soma vinculada nunca passa do valor do debito.
+  // Saldo exato sobe primeiro.
+  const valR = r2(+r.valor||0);
   const cand = D.lancamentos
-    .filter(l => l.tipo==='despesa' && (+l.valor||0) > 0 && !usados.has(l.id) && String(l.data) >= String(r.data))
-    .sort((a,b)=> (igual(b)?1:0) - (igual(a)?1:0) || String(b.data).localeCompare(String(a.data)))
-    .slice(0, 150);
-  const opts = cand.map(l=>`<option value="${esc(l.id)}">${fmtData(l.data)} · ${esc(String(l.descricao||'').slice(0,55))} · ${fmtN(l.valor)}${igual(l)?' ✓ mesmo valor':''}</option>`).join('');
+    .filter(l => l.tipo==='despesa' && l.origem!=='reembolso' && (+l.valor||0) > 0 && String(l.data) >= String(r.data)
+      && rbLivre(rbLista(), l) >= valR - 0.005)
+    .map(l => ({ l, livre: rbLivre(rbLista(), l) }));
+  const igual = x => Math.abs(x.livre - valR) < 0.01;
+  cand.sort((a,b)=> (igual(b)?1:0) - (igual(a)?1:0) || String(b.l.data).localeCompare(String(a.l.data)));
+  cand.splice(150);
+  const opts = cand.map(x=>{ const l = x.l, parcial = x.livre < r2(+l.valor||0) - 0.005;
+    return `<option value="${esc(l.id)}">${fmtData(l.data)} · ${esc(String(l.descricao||'').slice(0,50))} · ${fmtN(l.valor)}${parcial ? ` (livre ${fmtN(x.livre)})` : ''}${igual(x)?' ✓ fecha o valor':''}</option>`; }).join('');
 
   $('#rb-modal').innerHTML = `<div class="box">
     <h2>Registrar restituição</h2>
@@ -2020,7 +2028,8 @@ function abrirQuitacao(id){
         <div class="mopt"><label><input type="radio" name="rbmodo" value="link" ${cand.length?'':'disabled'}> Vincular a um débito que já veio no extrato${cand.length?'':' <span class="status">(nenhum disponível)</span>'}</label></div>
       </div>
       <div id="rb-m-novo"><span class="mlab">Data da saída</span><input type="date" id="rb-m-data" value="${hojeISO()}"></div>
-      <div id="rb-m-link" hidden><span class="mlab">Lançamento no extrato</span><select id="rb-m-lanc">${opts}</select></div>
+      <div id="rb-m-link" hidden><span class="mlab">Lançamento no extrato</span><select id="rb-m-lanc">${opts}</select>
+        <div class="status" id="rb-m-saldo" style="margin-top:6px"></div></div>
     </div>
     <div class="mfoot">
       <button class="btn secondary small" id="rb-m-cancel">Cancelar</button>
@@ -2033,6 +2042,14 @@ function abrirQuitacao(id){
   $('#rb-modal').querySelectorAll('input[name=rbmodo]').forEach(el=>{
     el.onchange = ()=>{ const m = modo(); $('#rb-m-novo').hidden = m!=='novo'; $('#rb-m-link').hidden = m!=='link'; };
   });
+  const mostraSaldo = () => {
+    const el = $('#rb-m-saldo'), l = D.lancamentos.find(x=>x.id===($('#rb-m-lanc')||{}).value);
+    if(!el) return; if(!l){ el.textContent=''; return; }
+    const livre = rbLivre(rbLista(), l), sobra = r2(livre - valR), n = rbLista().filter(x=>x.lancamentoId===l.id).length;
+    el.textContent = (n ? `Já cobre ${n} pendência${n>1?'s':''}. ` : '') + `Livre: ${fmt(livre)}`
+      + (sobra > 0.005 ? ` · depois desta sobram ${fmt(sobra)} para outras pendências` : ' · esta pendência fecha o débito');
+  };
+  if($('#rb-m-lanc')){ $('#rb-m-lanc').onchange = mostraSaldo; mostraSaldo(); }
   $('#rb-m-cancel').onclick = fecharModal;
   $('#rb-modal').onclick = e => { if(e.target === $('#rb-modal')) fecharModal(); };
 
@@ -2058,6 +2075,13 @@ function abrirQuitacao(id){
         const alvo = d.reembolsos.find(x=>x.id===id);
         if(!alvo) throw new Error('Pendência não encontrada — recarregue a página');
         if(alvo.status === 'quitado') throw new Error('Esta pendência já foi restituída em outra aba');
+        if(linkId){
+          // Confere de novo com o arquivo atual: outra aba pode ter usado o saldo.
+          const ld = (d.lancamentos||[]).find(x=>x.id===linkId);
+          if(!ld) throw new Error('Lançamento do extrato não encontrado — recarregue a página');
+          const livre = rbLivre(d.reembolsos, ld);
+          if(livre < r2(+alvo.valor||0) - 0.005) throw new Error(`O débito só tem ${fmt(livre)} livre — não cobre ${fmt(alvo.valor)}`);
+        }
         let lid = linkId;
         if(!lid){
           const nl = lanc(dataQ, desc, valor, 'despesa', cat, MESES[+dataQ.slice(5,7)-1],
